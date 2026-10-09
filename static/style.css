@@ -304,6 +304,7 @@ button:hover {
 }
 
 .article-row {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 1.25rem;
@@ -344,6 +345,8 @@ button:hover {
 }
 
 .read-form {
+  position: relative;
+  z-index: 2;
   flex: 0 0 auto;
   margin-left: auto;
 }
@@ -374,6 +377,13 @@ button:hover {
 
 .article-row h2 a {
   text-decoration: none;
+}
+
+.article-row h2 a::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  content: "";
 }
 
 .article-row h2 a:hover,

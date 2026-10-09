@@ -51,9 +51,9 @@
       <h2><a href="{{ article.open_url }}" rel="nofollow noopener noreferrer" referrerpolicy="no-referrer" data-article-open>{{ article.title }}</a></h2>
     </div>
     {% if article.has_thumbnail %}
-    <a class="article-thumbnail" href="{{ article.open_url }}" rel="nofollow noopener noreferrer" referrerpolicy="no-referrer" tabindex="-1" aria-hidden="true" data-article-open>
+    <div class="article-thumbnail" aria-hidden="true">
       <img src="{{ article.thumbnail_url }}" alt="" width="320" height="180" loading="lazy" decoding="async" referrerpolicy="no-referrer">
-    </a>
+    </div>
     {% endif %}
   </article>
   {% else %}
