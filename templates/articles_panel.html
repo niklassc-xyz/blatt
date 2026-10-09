@@ -1,7 +1,7 @@
-<section class="edition-header" aria-labelledby="page-title">
+<section class="page-header" aria-labelledby="page-title">
   <div>
-    <p class="eyebrow">Your local edition</p>
-    <h1 id="page-title">Latest headlines</h1>
+    <p class="eyebrow">Personal feed</p>
+    <h1 id="page-title">Latest</h1>
   </div>
   <form method="post" action="/refresh" hx-post="/refresh" hx-target="#articles-panel" hx-swap="innerHTML">
     <input type="hidden" name="tag" value="{{ selected_tag }}">
@@ -35,19 +35,21 @@
 <section class="article-list" aria-label="Articles">
   {% for article in articles %}
   <article class="article-row{% if article.has_thumbnail %} with-thumbnail{% endif %}{% if article.is_read %} is-read{% endif %}">
-    <div class="article-meta">
-      <span class="source">{{ article.source }}</span>
-      <time>{{ article.published }}</time>
-      <form class="read-form" method="post" action="/articles/read" hx-post="/articles/read" hx-target="#articles-panel" hx-swap="innerHTML">
-        <input type="hidden" name="url" value="{{ article.url }}">
-        <input type="hidden" name="tag" value="{{ selected_tag }}">
-        <input type="hidden" name="status" value="{{ selected_status }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="hidden" name="action" value="{% if article.is_read %}unread{% else %}read{% endif %}">
-        <button class="read-toggle" type="submit">{% if article.is_read %}Mark unread{% else %}Mark read{% endif %}</button>
-      </form>
+    <div class="article-main">
+      <div class="article-meta">
+        <span class="source">{{ article.source }}</span>
+        <time>{{ article.published }}</time>
+        <form class="read-form" method="post" action="/articles/read" hx-post="/articles/read" hx-target="#articles-panel" hx-swap="innerHTML">
+          <input type="hidden" name="url" value="{{ article.url }}">
+          <input type="hidden" name="tag" value="{{ selected_tag }}">
+          <input type="hidden" name="status" value="{{ selected_status }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="action" value="{% if article.is_read %}unread{% else %}read{% endif %}">
+          <button class="read-toggle" type="submit">{% if article.is_read %}Mark unread{% else %}Mark read{% endif %}</button>
+        </form>
+      </div>
+      <h2><a href="{{ article.open_url }}" rel="nofollow noopener noreferrer" referrerpolicy="no-referrer" data-article-open>{{ article.title }}</a></h2>
     </div>
-    <h2><a href="{{ article.open_url }}" rel="nofollow noopener noreferrer" referrerpolicy="no-referrer" data-article-open>{{ article.title }}</a></h2>
     {% if article.has_thumbnail %}
     <a class="article-thumbnail" href="{{ article.open_url }}" rel="nofollow noopener noreferrer" referrerpolicy="no-referrer" tabindex="-1" aria-hidden="true" data-article-open>
       <img src="{{ article.thumbnail_url }}" alt="" width="320" height="180" loading="lazy" decoding="async" referrerpolicy="no-referrer">
@@ -56,7 +58,7 @@
   </article>
   {% else %}
   <div class="empty-state">
-    <p class="empty-kicker">Nothing on the wire</p>
+    <p class="empty-kicker">All caught up</p>
     <h2>No cached articles to show.</h2>
     <p>Add a feed if needed, then use <strong>Refresh feeds</strong> to retrieve the latest entries.</p>
   </div>
