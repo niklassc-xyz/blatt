@@ -21,6 +21,9 @@
       <a{% if feed_nav_active %} class="active" aria-current="page"{% endif %} href="/">Feed</a>
       <a{% if sources_nav_active %} class="active" aria-current="page"{% endif %} href="/feeds">Sources</a>
     </nav>
+    <div class="header-actions">
+      {% block header_actions %}{% endblock %}
+    </div>
   </header>
   {% block content %}{% endblock %}
 </body>

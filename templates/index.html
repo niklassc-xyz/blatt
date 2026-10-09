@@ -2,8 +2,18 @@
 
 {% block title %}Headlines - Local Reader{% endblock %}
 
+{% block header_actions %}
+<form id="refresh-form" method="post" action="/refresh" hx-post="/refresh" hx-target="#articles-panel" hx-swap="innerHTML">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button class="refresh-button" type="submit" aria-label="Refresh feeds">
+    <span aria-hidden="true">&#8635;</span>
+    <span class="refresh-label">Refresh feeds</span>
+  </button>
+</form>
+{% endblock %}
+
 {% block content %}
-<main id="articles-panel" class="page-shell">
+<main id="articles-panel" class="page-shell feed-page">
   {% include "articles_panel.html" %}
 </main>
 {% endblock %}

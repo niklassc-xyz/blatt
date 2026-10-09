@@ -1,13 +1,5 @@
-<div class="feed-actions">
-  <form method="post" action="/refresh" hx-post="/refresh" hx-target="#articles-panel" hx-swap="innerHTML">
-    <input type="hidden" name="tag" value="{{ selected_tag }}">
-    <input type="hidden" name="status" value="{{ selected_status }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button class="refresh-button" type="submit">
-      <span aria-hidden="true">&#8635;</span> Refresh feeds
-    </button>
-  </form>
-</div>
+<input type="hidden" name="tag" value="{{ selected_tag }}" form="refresh-form">
+<input type="hidden" name="status" value="{{ selected_status }}" form="refresh-form">
 
 {% if !notice.text.is_empty() %}
 <p class="notice{% if notice.is_error %} notice-error{% endif %}" role="status">{{ notice.text }}</p>
