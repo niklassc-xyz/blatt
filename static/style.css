@@ -215,6 +215,11 @@ button:hover {
   line-height: 1;
 }
 
+.feed-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .text-link {
   color: var(--interactive-text);
   text-decoration: none;
@@ -247,7 +252,7 @@ button:hover {
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
-  margin: 2rem 0 0.6rem;
+  margin: 1rem 0 0.6rem;
   padding: 0.35rem;
   border: 1px solid var(--highlight-med);
   border-radius: 4px;
@@ -668,10 +673,6 @@ input:focus {
     display: grid;
     grid-template-columns: 1fr;
     gap: 1.25rem;
-  }
-
-  .filter-bar {
-    margin-top: 1.5rem;
   }
 
   .article-row,

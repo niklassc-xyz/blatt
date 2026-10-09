@@ -1,8 +1,4 @@
-<section class="page-header" aria-labelledby="page-title">
-  <div>
-    <p class="eyebrow">Personal feed</p>
-    <h1 id="page-title">Latest</h1>
-  </div>
+<div class="feed-actions">
   <form method="post" action="/refresh" hx-post="/refresh" hx-target="#articles-panel" hx-swap="innerHTML">
     <input type="hidden" name="tag" value="{{ selected_tag }}">
     <input type="hidden" name="status" value="{{ selected_status }}">
@@ -11,7 +7,7 @@
       <span aria-hidden="true">&#8635;</span> Refresh feeds
     </button>
   </form>
-</section>
+</div>
 
 {% if !notice.text.is_empty() %}
 <p class="notice{% if notice.is_error %} notice-error{% endif %}" role="status">{{ notice.text }}</p>
