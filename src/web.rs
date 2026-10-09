@@ -70,6 +70,8 @@ struct ArticleView {
     url: String,
     source: String,
     published: String,
+    thumbnail_url: String,
+    has_thumbnail: bool,
 }
 
 #[derive(Clone)]
@@ -371,11 +373,14 @@ fn article_view(article: StoredArticle) -> ArticleView {
         .unwrap_or(DateTime::<Utc>::UNIX_EPOCH)
         .format("%b %-d, %Y, %H:%M UTC")
         .to_string();
+    let thumbnail_url = article.thumbnail_url.unwrap_or_default();
     ArticleView {
         title: article.title,
         url: article.url,
         source: article.source_name,
         published,
+        has_thumbnail: !thumbnail_url.is_empty(),
+        thumbnail_url,
     }
 }
 

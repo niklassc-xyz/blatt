@@ -24,12 +24,17 @@
 
 <section class="article-list" aria-label="Articles">
   {% for article in articles %}
-  <article class="article-row">
+  <article class="article-row{% if article.has_thumbnail %} with-thumbnail{% endif %}">
     <div class="article-meta">
       <span class="source">{{ article.source }}</span>
       <time>{{ article.published }}</time>
     </div>
     <h2><a href="{{ article.url }}" rel="noopener noreferrer">{{ article.title }}</a></h2>
+    {% if article.has_thumbnail %}
+    <a class="article-thumbnail" href="{{ article.url }}" rel="noopener noreferrer" tabindex="-1" aria-hidden="true">
+      <img src="{{ article.thumbnail_url }}" alt="" width="320" height="180" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+    </a>
+    {% endif %}
   </article>
   {% else %}
   <div class="empty-state">

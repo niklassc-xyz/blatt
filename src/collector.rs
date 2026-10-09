@@ -111,7 +111,12 @@ fn parse_articles(
     bytes: &[u8],
     base_url: &Url,
 ) -> Result<Vec<Article>, String> {
-    let parsed = feed_rs::parser::parse(Cursor::new(bytes)).map_err(|error| error.to_string())?;
+    let parser = feed_rs::parser::Builder::new()
+        .base_uri(Some(base_url.as_str()))
+        .build();
+    let parsed = parser
+        .parse(Cursor::new(bytes))
+        .map_err(|error| error.to_string())?;
     let fetched_at = Utc::now().timestamp();
 
     Ok(parsed
@@ -127,6 +132,7 @@ fn article_from_entry(
     base_url: &Url,
     fetched_at: i64,
 ) -> Option<Article> {
+    let thumbnail_url = thumbnail_from_entry(&entry, base_url);
     let title = entry.title?.content.trim().to_owned();
     if title.is_empty() {
         return None;
@@ -161,7 +167,86 @@ fn article_from_entry(
         published_at,
         fetched_at,
         date_is_fallback: published.is_none(),
+        thumbnail_url,
     })
+}
+
+fn thumbnail_from_entry(entry: &Entry, base_url: &Url) -> Option<String> {
+    entry
+        .media
+        .iter()
+        .flat_map(|media| media.thumbnails.iter())
+        .filter_map(|thumbnail| {
+            let url = web_url(&thumbnail.image.uri, base_url)?;
+            let area = u64::from(thumbnail.image.width.unwrap_or_default())
+                * u64::from(thumbnail.image.height.unwrap_or_default());
+            Some((area, url))
+        })
+        .max_by_key(|(area, _)| *area)
+        .map(|(_, url)| url)
+        .or_else(|| {
+            entry
+                .media
+                .iter()
+                .flat_map(|media| media.content.iter())
+                .filter_map(|content| {
+                    let url = content.url.as_ref()?;
+                    if !matches!(url.scheme(), "http" | "https") {
+                        return None;
+                    }
+                    if !is_image_url(content.content_type.as_ref().map(AsRef::as_ref), url) {
+                        return None;
+                    }
+                    let area = u64::from(content.width.unwrap_or_default())
+                        * u64::from(content.height.unwrap_or_default());
+                    Some((area, url.to_string()))
+                })
+                .max_by_key(|(area, _)| *area)
+                .map(|(_, url)| url)
+        })
+        .or_else(|| {
+            entry.links.iter().find_map(|link| {
+                if link.rel.as_deref() != Some("enclosure") {
+                    return None;
+                }
+                let url = Url::parse(&link.href)
+                    .or_else(|_| base_url.join(&link.href))
+                    .ok()?;
+                if !matches!(url.scheme(), "http" | "https") {
+                    return None;
+                }
+                is_image_url(link.media_type.as_deref(), &url).then(|| url.to_string())
+            })
+        })
+}
+
+fn is_image_url(media_type: Option<&str>, url: &Url) -> bool {
+    match media_type {
+        Some(media_type) => media_type.trim().to_ascii_lowercase().starts_with("image/"),
+        None => url
+            .path_segments()
+            .and_then(Iterator::last)
+            .and_then(|name| name.rsplit_once('.').map(|(_, extension)| extension))
+            .is_some_and(|extension| {
+                matches!(
+                    extension.to_ascii_lowercase().as_str(),
+                    "avif" | "gif" | "jpeg" | "jpg" | "png" | "webp"
+                )
+            }),
+    }
+}
+
+fn web_url(value: &str, base_url: &Url) -> Option<String> {
+    let value = value.trim();
+    if value.is_empty() || value.starts_with('#') {
+        return None;
+    }
+    let mut url = Url::parse(value).or_else(|_| base_url.join(value)).ok()?;
+    if !matches!(url.scheme(), "http" | "https") {
+        return None;
+    }
+    url.set_fragment(None);
+    Some(url.to_string())
 }
 
 #[cfg(test)]
@@ -171,7 +256,9 @@ mod tests {
     #[test]
     fn parses_youtube_atom_entries() {
         let xml = br#"<?xml version="1.0" encoding="UTF-8"?>
-            <feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015">
+            <feed xmlns="http://www.w3.org/2005/Atom"
+                  xmlns:yt="http://www.youtube.com/xml/schemas/2015"
+                  xmlns:media="http://search.yahoo.com/mrss/">
               <title>Example Channel</title>
               <entry>
                 <id>yt:video:abc123</id>
@@ -179,6 +266,9 @@ mod tests {
                 <title>A useful video</title>
                 <link rel="alternate" href="https://www.youtube.com/watch?v=abc123"/>
                 <published>2026-01-02T03:04:05+00:00</published>
+                <media:group>
+                  <media:thumbnail url="https://i.ytimg.com/vi/abc123/hqdefault.jpg" width="480" height="360"/>
+                </media:group>
               </entry>
             </feed>"#;
         let feed = FeedConfig {
@@ -193,6 +283,10 @@ mod tests {
         assert_eq!(articles[0].title, "A useful video");
         assert_eq!(articles[0].url, "https://www.youtube.com/watch?v=abc123");
         assert_eq!(articles[0].source_name, "Example Channel");
+        assert_eq!(
+            articles[0].thumbnail_url.as_deref(),
+            Some("https://i.ytimg.com/vi/abc123/hqdefault.jpg")
+        );
     }
 
     #[test]
@@ -218,5 +312,35 @@ mod tests {
         let articles = parse_articles(&feed, xml, &final_url).unwrap();
         assert_eq!(articles.len(), 1);
         assert_eq!(articles[0].url, "https://new.example/articles/one");
+    }
+
+    #[test]
+    fn uses_image_enclosures_as_thumbnails() {
+        let xml = br#"<?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0">
+              <channel>
+                <title>Photo Feed</title>
+                <link>https://example.com/</link>
+                <description>Photos</description>
+                <item>
+                  <title>A photographed story</title>
+                  <link>https://example.com/story</link>
+                  <enclosure url="images/story.jpg" type="image/jpeg" length="12000"/>
+                </item>
+              </channel>
+            </rss>"#;
+        let feed = FeedConfig {
+            url: "https://example.com/feed.xml".to_owned(),
+            name: "Photo Feed".to_owned(),
+            tags: Vec::new(),
+        };
+        let base_url = Url::parse("https://cdn.example.com/redirected/feed.xml").unwrap();
+
+        let articles = parse_articles(&feed, xml, &base_url).unwrap();
+        assert_eq!(articles.len(), 1);
+        assert_eq!(
+            articles[0].thumbnail_url.as_deref(),
+            Some("https://cdn.example.com/redirected/images/story.jpg")
+        );
     }
 }
