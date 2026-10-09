@@ -168,6 +168,8 @@ struct IndexTemplate {
     read_filters: Vec<ReadFilterView>,
     csrf_token: String,
     notice: Notice,
+    feed_nav_active: bool,
+    sources_nav_active: bool,
 }
 
 #[derive(Template)]
@@ -192,6 +194,8 @@ struct FeedsTemplate {
     notice: Notice,
     config_path: String,
     csrf_token: String,
+    feed_nav_active: bool,
+    sources_nav_active: bool,
 }
 
 #[derive(Template)]
@@ -335,6 +339,8 @@ async fn feeds_page(State(state): State<AppState>) -> Result<Response, AppError>
         notice: list.notice,
         config_path: state.config_path,
         csrf_token: state.csrf_token,
+        feed_nav_active: false,
+        sources_nav_active: true,
     })
 }
 
@@ -437,6 +443,8 @@ fn render_feed_response(
             notice: list.notice,
             config_path: state.config_path.clone(),
             csrf_token: state.csrf_token.clone(),
+            feed_nav_active: false,
+            sources_nav_active: true,
         })
     }
 }
@@ -655,6 +663,8 @@ fn render_index(panel: ArticlesPanel) -> Result<Response, AppError> {
         read_filters: panel.read_filters,
         csrf_token: panel.csrf_token,
         notice: panel.notice,
+        feed_nav_active: true,
+        sources_nav_active: false,
     })
 }
 

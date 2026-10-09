@@ -141,6 +141,12 @@ a {
   outline-offset: 0;
 }
 
+.site-header nav a.active {
+  color: var(--base);
+  background: var(--text);
+  font-weight: 750;
+}
+
 .page-shell {
   width: min(100% - 2.5rem, 960px);
   margin: 0 auto;
@@ -295,8 +301,9 @@ button:hover {
 
 .tag.active,
 .status-option.active {
-  color: var(--text);
-  background: var(--surface);
+  color: var(--base);
+  background: var(--text);
+  font-weight: 750;
 }
 
 .article-list {

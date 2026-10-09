@@ -19,15 +19,15 @@
 
 <div class="filter-bar">
   <nav class="tag-strip" aria-label="Filter headlines by tag">
-    <a class="tag{% if all_active %} active{% endif %}" href="{{ all_tags_href }}" hx-get="{{ all_tags_fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ all_tags_href }}">All tags</a>
+    <a class="tag{% if all_active %} active{% endif %}"{% if all_active %} aria-current="true"{% endif %} href="{{ all_tags_href }}" hx-get="{{ all_tags_fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ all_tags_href }}">All tags</a>
     {% for tag in tags %}
-    <a class="tag{% if tag.active %} active{% endif %}" href="{{ tag.href }}" hx-get="{{ tag.fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ tag.href }}">{{ tag.name }}</a>
+    <a class="tag{% if tag.active %} active{% endif %}"{% if tag.active %} aria-current="true"{% endif %} href="{{ tag.href }}" hx-get="{{ tag.fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ tag.href }}">{{ tag.name }}</a>
     {% endfor %}
   </nav>
   <nav class="read-filter" aria-label="Filter headlines by read status">
     <span>Status</span>
     {% for filter in read_filters %}
-    <a class="status-option{% if filter.active %} active{% endif %}" href="{{ filter.href }}" hx-get="{{ filter.fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ filter.href }}">{{ filter.name }}</a>
+    <a class="status-option{% if filter.active %} active{% endif %}"{% if filter.active %} aria-current="true"{% endif %} href="{{ filter.href }}" hx-get="{{ filter.fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ filter.href }}">{{ filter.name }}</a>
     {% endfor %}
   </nav>
 </div>
