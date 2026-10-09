@@ -98,6 +98,12 @@ impl ConfigStore {
         if current.iter().any(|item| item.url == feed.url) {
             return Err(ConfigError::DuplicateUrl);
         }
+        if current
+            .iter()
+            .any(|item| feed_names_equal(&item.name, &feed.name))
+        {
+            return Err(ConfigError::DuplicateName);
+        }
 
         let mut updated = current.clone();
         updated.push(feed);
@@ -120,6 +126,11 @@ impl ConfigStore {
             .any(|(other_index, item)| other_index != index && item.url == feed.url)
         {
             return Err(ConfigError::DuplicateUrl);
+        }
+        if current.iter().enumerate().any(|(other_index, item)| {
+            other_index != index && feed_names_equal(&item.name, &feed.name)
+        }) {
+            return Err(ConfigError::DuplicateName);
         }
 
         let mut updated = current.clone();
@@ -156,13 +167,21 @@ impl ConfigStore {
 
 fn normalize_all(feeds: &mut [FeedConfig]) -> Result<(), ConfigError> {
     let mut urls = HashSet::new();
+    let mut names = HashSet::new();
     for feed in feeds {
         normalize_feed(feed)?;
         if !urls.insert(feed.url.clone()) {
             return Err(ConfigError::DuplicateUrl);
         }
+        if !names.insert(feed.name.to_lowercase()) {
+            return Err(ConfigError::DuplicateName);
+        }
     }
     Ok(())
+}
+
+fn feed_names_equal(left: &str, right: &str) -> bool {
+    left.to_lowercase() == right.to_lowercase()
 }
 
 fn normalize_feed(feed: &mut FeedConfig) -> Result<(), ConfigError> {
@@ -208,6 +227,8 @@ pub enum ConfigError {
     InvalidUrl,
     #[error("a feed with that URL already exists")]
     DuplicateUrl,
+    #[error("a feed with that name already exists")]
+    DuplicateName,
     #[error("feed was not found")]
     NotFound,
     #[error("configuration is currently unavailable")]
@@ -247,5 +268,69 @@ mod tests {
                 tags: vec!["news".to_owned(), "rust".to_owned()],
             }]
         );
+    }
+
+    #[test]
+    fn feed_names_must_be_unique_ignoring_case() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("feeds.toml");
+        let store = ConfigStore::load(path).unwrap();
+
+        store
+            .add(FeedConfig {
+                url: "https://example.com/first".to_owned(),
+                name: "Example".to_owned(),
+                tags: Vec::new(),
+            })
+            .unwrap();
+        let duplicate = store.add(FeedConfig {
+            url: "https://example.com/second".to_owned(),
+            name: "example".to_owned(),
+            tags: Vec::new(),
+        });
+
+        assert!(matches!(duplicate, Err(ConfigError::DuplicateName)));
+
+        store
+            .add(FeedConfig {
+                url: "https://example.com/other".to_owned(),
+                name: "Other".to_owned(),
+                tags: Vec::new(),
+            })
+            .unwrap();
+        let duplicate = store.update(
+            "https://example.com/other",
+            FeedConfig {
+                url: "https://example.com/other".to_owned(),
+                name: "EXAMPLE".to_owned(),
+                tags: Vec::new(),
+            },
+        );
+
+        assert!(matches!(duplicate, Err(ConfigError::DuplicateName)));
+    }
+
+    #[test]
+    fn duplicate_feed_names_in_the_configuration_are_rejected() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("feeds.toml");
+        fs::write(
+            &path,
+            r#"
+[[feeds]]
+url = "https://example.com/first"
+name = "Example"
+
+[[feeds]]
+url = "https://example.com/second"
+name = "example"
+"#,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            ConfigStore::load(path),
+            Err(ConfigError::DuplicateName)
+        ));
     }
 }

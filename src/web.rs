@@ -34,12 +34,20 @@ struct AppState {
 
 #[derive(Debug, Deserialize, Default)]
 struct ArticleQuery {
+    feed: Option<String>,
     tag: Option<String>,
     status: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
+struct FeedQuery {
+    tag: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
 struct RefreshForm {
+    #[serde(default)]
+    feed: String,
     #[serde(default)]
     tag: String,
     #[serde(default)]
@@ -57,6 +65,8 @@ struct OpenArticleQuery {
 struct ReadArticleForm {
     url: String,
     action: ReadAction,
+    #[serde(default)]
+    feed: String,
     #[serde(default)]
     tag: String,
     #[serde(default)]
@@ -124,6 +134,21 @@ struct ReadFilterView {
     active: bool,
 }
 
+#[derive(Clone, Debug, Default)]
+struct ArticleFilters {
+    feed: String,
+    tag: String,
+    read_filter: ReadFilter,
+}
+
+#[derive(Clone)]
+struct FeedDirectoryView {
+    name: String,
+    url: String,
+    tags: Vec<String>,
+    posts_href: String,
+}
+
 #[derive(Clone)]
 struct FeedView {
     url: String,
@@ -140,14 +165,27 @@ struct Notice {
 struct ArticlesPanel {
     articles: Vec<ArticleView>,
     tags: Vec<TagView>,
+    selected_feed: String,
+    selected_feed_name: String,
     selected_tag: String,
     selected_status: String,
+    all_feeds_href: String,
+    all_feeds_fragment_href: String,
     all_active: bool,
     all_tags_href: String,
     all_tags_fragment_href: String,
     read_filters: Vec<ReadFilterView>,
     csrf_token: String,
     notice: Notice,
+}
+
+struct FeedsPanel {
+    feeds: Vec<FeedDirectoryView>,
+    tags: Vec<TagView>,
+    selected_tag: String,
+    all_active: bool,
+    all_tags_href: String,
+    all_tags_fragment_href: String,
 }
 
 struct FeedList {
@@ -160,15 +198,20 @@ struct FeedList {
 struct IndexTemplate {
     articles: Vec<ArticleView>,
     tags: Vec<TagView>,
+    selected_feed: String,
+    selected_feed_name: String,
     selected_tag: String,
     selected_status: String,
+    all_feeds_href: String,
+    all_feeds_fragment_href: String,
     all_active: bool,
     all_tags_href: String,
     all_tags_fragment_href: String,
     read_filters: Vec<ReadFilterView>,
     csrf_token: String,
     notice: Notice,
-    feed_nav_active: bool,
+    posts_nav_active: bool,
+    feeds_nav_active: bool,
     sources_nav_active: bool,
 }
 
@@ -177,8 +220,12 @@ struct IndexTemplate {
 struct ArticlesPanelTemplate {
     articles: Vec<ArticleView>,
     tags: Vec<TagView>,
+    selected_feed: String,
+    selected_feed_name: String,
     selected_tag: String,
     selected_status: String,
+    all_feeds_href: String,
+    all_feeds_fragment_href: String,
     all_active: bool,
     all_tags_href: String,
     all_tags_fragment_href: String,
@@ -190,11 +237,37 @@ struct ArticlesPanelTemplate {
 #[derive(Template)]
 #[template(path = "feeds.html")]
 struct FeedsTemplate {
+    feeds: Vec<FeedDirectoryView>,
+    tags: Vec<TagView>,
+    selected_tag: String,
+    all_active: bool,
+    all_tags_href: String,
+    all_tags_fragment_href: String,
+    posts_nav_active: bool,
+    feeds_nav_active: bool,
+    sources_nav_active: bool,
+}
+
+#[derive(Template)]
+#[template(path = "feeds_panel.html")]
+struct FeedsPanelTemplate {
+    feeds: Vec<FeedDirectoryView>,
+    tags: Vec<TagView>,
+    selected_tag: String,
+    all_active: bool,
+    all_tags_href: String,
+    all_tags_fragment_href: String,
+}
+
+#[derive(Template)]
+#[template(path = "sources.html")]
+struct SourcesTemplate {
     feeds: Vec<FeedView>,
     notice: Notice,
     config_path: String,
     csrf_token: String,
-    feed_nav_active: bool,
+    posts_nav_active: bool,
+    feeds_nav_active: bool,
     sources_nav_active: bool,
 }
 
@@ -225,9 +298,11 @@ pub async fn serve(address: SocketAddr, paths: AppPaths) -> Result<(), Box<dyn s
         .route("/articles/open", get(open_article))
         .route("/articles/read", post(set_article_read))
         .route("/refresh", post(refresh))
-        .route("/feeds", get(feeds_page).post(add_feed))
-        .route("/feeds/update", post(update_feed))
-        .route("/feeds/delete", post(delete_feed))
+        .route("/feeds", get(feeds_page))
+        .route("/feeds/list", get(feeds_fragment))
+        .route("/sources", get(sources_page).post(add_feed))
+        .route("/sources/update", post(update_feed))
+        .route("/sources/delete", post(delete_feed))
         .route("/static/style.css", get(stylesheet))
         .route("/static/htmx.min.js", get(htmx))
         .route("/static/navigation.js", get(navigation_script))
@@ -246,7 +321,12 @@ async fn index(
     Query(query): Query<ArticleQuery>,
 ) -> Result<Response, AppError> {
     let read_filter = read_filter_from_status(query.status.as_deref());
-    let panel = build_articles_panel(&state, query.tag, read_filter, Notice::default()).await?;
+    let filters = ArticleFilters {
+        feed: query.feed.unwrap_or_default(),
+        tag: query.tag.unwrap_or_default(),
+        read_filter,
+    };
+    let panel = build_articles_panel(&state, &filters, Notice::default()).await?;
     render_index(panel)
 }
 
@@ -255,7 +335,12 @@ async fn articles_fragment(
     Query(query): Query<ArticleQuery>,
 ) -> Result<Response, AppError> {
     let read_filter = read_filter_from_status(query.status.as_deref());
-    let panel = build_articles_panel(&state, query.tag, read_filter, Notice::default()).await?;
+    let filters = ArticleFilters {
+        feed: query.feed.unwrap_or_default(),
+        tag: query.tag.unwrap_or_default(),
+        read_filter,
+    };
+    let panel = build_articles_panel(&state, &filters, Notice::default()).await?;
     render_articles_panel(panel)
 }
 
@@ -293,12 +378,14 @@ async fn set_article_read(
         return Err(AppError::ArticleNotFound);
     }
 
-    let selected_tag = (!form.tag.is_empty()).then_some(form.tag);
-    let read_filter = read_filter_from_status(Some(&form.status));
+    let filters = ArticleFilters {
+        feed: form.feed,
+        tag: form.tag,
+        read_filter: read_filter_from_status(Some(&form.status)),
+    };
     let panel = build_articles_panel(
         &state,
-        selected_tag,
-        read_filter,
+        &filters,
         Notice {
             text: message.to_owned(),
             is_error: false,
@@ -308,7 +395,7 @@ async fn set_article_read(
     if is_htmx(&headers) {
         render_articles_panel(panel)
     } else {
-        Ok(Redirect::to(&articles_url("/", &panel.selected_tag, read_filter)).into_response())
+        Ok(Redirect::to(&articles_url("/", &filters)).into_response())
     }
 }
 
@@ -322,24 +409,53 @@ async fn refresh(
     let feeds = state.config.feeds()?;
     let report = state.collector.refresh(feeds, &state.storage).await;
     let notice = refresh_notice(&report);
-    let selected_tag = (!form.tag.is_empty()).then_some(form.tag);
-    let read_filter = read_filter_from_status(Some(&form.status));
-    let panel = build_articles_panel(&state, selected_tag, read_filter, notice).await?;
+    let filters = ArticleFilters {
+        feed: form.feed,
+        tag: form.tag,
+        read_filter: read_filter_from_status(Some(&form.status)),
+    };
+    let panel = build_articles_panel(&state, &filters, notice).await?;
     if is_htmx(&headers) {
         render_articles_panel(panel)
     } else {
-        Ok(Redirect::to(&articles_url("/", &panel.selected_tag, read_filter)).into_response())
+        Ok(Redirect::to(&articles_url("/", &filters)).into_response())
     }
 }
 
-async fn feeds_page(State(state): State<AppState>) -> Result<Response, AppError> {
-    let list = build_feed_list(&state, Notice::default())?;
+async fn feeds_page(
+    State(state): State<AppState>,
+    Query(query): Query<FeedQuery>,
+) -> Result<Response, AppError> {
+    let panel = build_feeds_panel(&state, query.tag)?;
     render_template(FeedsTemplate {
+        feeds: panel.feeds,
+        tags: panel.tags,
+        selected_tag: panel.selected_tag,
+        all_active: panel.all_active,
+        all_tags_href: panel.all_tags_href,
+        all_tags_fragment_href: panel.all_tags_fragment_href,
+        posts_nav_active: false,
+        feeds_nav_active: true,
+        sources_nav_active: false,
+    })
+}
+
+async fn feeds_fragment(
+    State(state): State<AppState>,
+    Query(query): Query<FeedQuery>,
+) -> Result<Response, AppError> {
+    render_feeds_panel(build_feeds_panel(&state, query.tag)?)
+}
+
+async fn sources_page(State(state): State<AppState>) -> Result<Response, AppError> {
+    let list = build_feed_list(&state, Notice::default())?;
+    render_template(SourcesTemplate {
         feeds: list.feeds,
         notice: list.notice,
         config_path: state.config_path,
         csrf_token: state.csrf_token,
-        feed_nav_active: false,
+        posts_nav_active: false,
+        feeds_nav_active: false,
         sources_nav_active: true,
     })
 }
@@ -356,7 +472,7 @@ async fn add_feed(
         tags: tags_from_input(&form.tags),
     });
     let notice = operation_notice(result, "Feed added. Use refresh to retrieve its articles.");
-    render_feed_response(&state, &headers, notice)
+    render_source_response(&state, &headers, notice)
 }
 
 async fn update_feed(
@@ -400,7 +516,7 @@ async fn update_feed(
             )
         }
     };
-    render_feed_response(&state, &headers, notice)
+    render_source_response(&state, &headers, notice)
 }
 
 async fn delete_feed(
@@ -422,10 +538,10 @@ async fn delete_feed(
             "Feed deleted, but its hidden cache rows could not be removed.",
         ),
     };
-    render_feed_response(&state, &headers, notice)
+    render_source_response(&state, &headers, notice)
 }
 
-fn render_feed_response(
+fn render_source_response(
     state: &AppState,
     headers: &HeaderMap,
     notice: Notice,
@@ -438,12 +554,13 @@ fn render_feed_response(
             csrf_token: state.csrf_token.clone(),
         })
     } else {
-        render_template(FeedsTemplate {
+        render_template(SourcesTemplate {
             feeds: list.feeds,
             notice: list.notice,
             config_path: state.config_path.clone(),
             csrf_token: state.csrf_token.clone(),
-            feed_nav_active: false,
+            posts_nav_active: false,
+            feeds_nav_active: false,
             sources_nav_active: true,
         })
     }
@@ -451,35 +568,42 @@ fn render_feed_response(
 
 async fn build_articles_panel(
     state: &AppState,
-    selected_tag: Option<String>,
-    read_filter: ReadFilter,
+    filters: &ArticleFilters,
     notice: Notice,
 ) -> Result<ArticlesPanel, AppError> {
     let feeds = state.config.feeds()?;
-    let selected_tag = selected_tag.unwrap_or_default();
-    let feed_urls = feeds
-        .iter()
-        .filter(|feed| selected_tag.is_empty() || feed.tags.contains(&selected_tag))
-        .map(|feed| feed.url.clone())
-        .collect::<Vec<_>>();
+    let feed_urls = selected_feed_urls(&feeds, filters);
     let articles = state
         .storage
-        .list_articles(&feed_urls, read_filter)
+        .list_articles(&feed_urls, filters.read_filter)
         .await?
         .into_iter()
         .map(|article| article_view(article, &state.csrf_token))
         .collect();
-    let all_active = selected_tag.is_empty();
+    let selected_feed_name = if filters.feed.is_empty() {
+        String::new()
+    } else {
+        feeds
+            .iter()
+            .find(|feed| feed_name_matches(&feed.name, &filters.feed))
+            .map(|feed| feed.name.clone())
+            .unwrap_or_else(|| "Unavailable feed".to_owned())
+    };
+    let all_active = filters.tag.is_empty();
     let tags = feeds
         .iter()
         .flat_map(|feed| feed.tags.iter().cloned())
         .collect::<BTreeSet<_>>()
         .into_iter()
-        .map(|name| TagView {
-            href: articles_url("/", &name, read_filter),
-            fragment_href: articles_url("/articles", &name, read_filter),
-            active: name == selected_tag,
-            name,
+        .map(|name| {
+            let mut tag_filters = filters.clone();
+            tag_filters.tag = name.clone();
+            TagView {
+                href: articles_url("/", &tag_filters),
+                fragment_href: articles_url("/articles", &tag_filters),
+                active: name == filters.tag,
+                name,
+            }
         })
         .collect();
     let read_filters = [
@@ -488,22 +612,35 @@ async fn build_articles_panel(
         (ReadFilter::Read, "Read"),
     ]
     .into_iter()
-    .map(|(filter, name)| ReadFilterView {
-        name,
-        href: articles_url("/", &selected_tag, filter),
-        fragment_href: articles_url("/articles", &selected_tag, filter),
-        active: filter == read_filter,
+    .map(|(filter, name)| {
+        let mut status_filters = filters.clone();
+        status_filters.read_filter = filter;
+        ReadFilterView {
+            name,
+            href: articles_url("/", &status_filters),
+            fragment_href: articles_url("/articles", &status_filters),
+            active: filter == filters.read_filter,
+        }
     })
     .collect();
+
+    let mut all_tags_filters = filters.clone();
+    all_tags_filters.tag.clear();
+    let mut all_feeds_filters = filters.clone();
+    all_feeds_filters.feed.clear();
 
     Ok(ArticlesPanel {
         articles,
         tags,
-        selected_status: read_filter_status(read_filter).to_owned(),
-        selected_tag: selected_tag.clone(),
+        selected_feed: filters.feed.clone(),
+        selected_feed_name,
+        selected_status: read_filter_status(filters.read_filter).to_owned(),
+        selected_tag: filters.tag.clone(),
+        all_feeds_href: articles_url("/", &all_feeds_filters),
+        all_feeds_fragment_href: articles_url("/articles", &all_feeds_filters),
         all_active,
-        all_tags_href: articles_url("/", "", read_filter),
-        all_tags_fragment_href: articles_url("/articles", "", read_filter),
+        all_tags_href: articles_url("/", &all_tags_filters),
+        all_tags_fragment_href: articles_url("/articles", &all_tags_filters),
         read_filters,
         csrf_token: state.csrf_token.clone(),
         notice,
@@ -532,12 +669,15 @@ fn article_view(article: StoredArticle, csrf_token: &str) -> ArticleView {
     }
 }
 
-fn articles_url(base: &str, tag: &str, read_filter: ReadFilter) -> String {
+fn articles_url(base: &str, filters: &ArticleFilters) -> String {
     let mut query = url::form_urlencoded::Serializer::new(String::new());
-    if !tag.is_empty() {
-        query.append_pair("tag", tag);
+    if !filters.feed.is_empty() {
+        query.append_pair("feed", &filters.feed);
     }
-    let status = read_filter_status(read_filter);
+    if !filters.tag.is_empty() {
+        query.append_pair("tag", &filters.tag);
+    }
+    let status = read_filter_status(filters.read_filter);
     if !status.is_empty() {
         query.append_pair("status", status);
     }
@@ -547,6 +687,19 @@ fn articles_url(base: &str, tag: &str, read_filter: ReadFilter) -> String {
     } else {
         format!("{base}?{query}")
     }
+}
+
+fn selected_feed_urls(feeds: &[FeedConfig], filters: &ArticleFilters) -> Vec<String> {
+    feeds
+        .iter()
+        .filter(|feed| filters.feed.is_empty() || feed_name_matches(&feed.name, &filters.feed))
+        .filter(|feed| filters.tag.is_empty() || feed.tags.contains(&filters.tag))
+        .map(|feed| feed.url.clone())
+        .collect()
+}
+
+fn feed_name_matches(configured_name: &str, selected_name: &str) -> bool {
+    configured_name.to_lowercase() == selected_name.to_lowercase()
 }
 
 fn read_filter_from_status(status: Option<&str>) -> ReadFilter {
@@ -578,6 +731,73 @@ fn build_feed_list(state: &AppState, notice: Notice) -> Result<FeedList, AppErro
         .collect::<Vec<_>>();
     feeds.sort_by_key(|feed| feed.name.to_lowercase());
     Ok(FeedList { feeds, notice })
+}
+
+fn build_feeds_panel(
+    state: &AppState,
+    selected_tag: Option<String>,
+) -> Result<FeedsPanel, AppError> {
+    Ok(feed_directory(
+        state.config.feeds()?,
+        selected_tag.unwrap_or_default(),
+    ))
+}
+
+fn feed_directory(mut feeds: Vec<FeedConfig>, selected_tag: String) -> FeedsPanel {
+    let all_active = selected_tag.is_empty();
+    let tags = feeds
+        .iter()
+        .flat_map(|feed| feed.tags.iter().cloned())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|name| TagView {
+            href: feeds_url("/feeds", &name),
+            fragment_href: feeds_url("/feeds/list", &name),
+            active: name == selected_tag,
+            name,
+        })
+        .collect();
+    feeds.sort_by_key(|feed| feed.name.to_lowercase());
+    let feeds = feeds
+        .into_iter()
+        .filter(|feed| selected_tag.is_empty() || feed.tags.contains(&selected_tag))
+        .map(|feed| {
+            let posts_href = articles_url(
+                "/",
+                &ArticleFilters {
+                    feed: feed.name.clone(),
+                    ..ArticleFilters::default()
+                },
+            );
+            FeedDirectoryView {
+                name: feed.name,
+                url: feed.url,
+                tags: feed.tags,
+                posts_href,
+            }
+        })
+        .collect();
+    FeedsPanel {
+        feeds,
+        tags,
+        selected_tag,
+        all_active,
+        all_tags_href: "/feeds".to_owned(),
+        all_tags_fragment_href: "/feeds/list".to_owned(),
+    }
+}
+
+fn feeds_url(base: &str, tag: &str) -> String {
+    let mut query = url::form_urlencoded::Serializer::new(String::new());
+    if !tag.is_empty() {
+        query.append_pair("tag", tag);
+    }
+    let query = query.finish();
+    if query.is_empty() {
+        base.to_owned()
+    } else {
+        format!("{base}?{query}")
+    }
 }
 
 fn refresh_notice(report: &RefreshReport) -> Notice {
@@ -640,8 +860,12 @@ fn render_articles_panel(panel: ArticlesPanel) -> Result<Response, AppError> {
     render_template(ArticlesPanelTemplate {
         articles: panel.articles,
         tags: panel.tags,
+        selected_feed: panel.selected_feed,
+        selected_feed_name: panel.selected_feed_name,
         selected_tag: panel.selected_tag,
         selected_status: panel.selected_status,
+        all_feeds_href: panel.all_feeds_href,
+        all_feeds_fragment_href: panel.all_feeds_fragment_href,
         all_active: panel.all_active,
         all_tags_href: panel.all_tags_href,
         all_tags_fragment_href: panel.all_tags_fragment_href,
@@ -655,16 +879,32 @@ fn render_index(panel: ArticlesPanel) -> Result<Response, AppError> {
     render_template(IndexTemplate {
         articles: panel.articles,
         tags: panel.tags,
+        selected_feed: panel.selected_feed,
+        selected_feed_name: panel.selected_feed_name,
         selected_tag: panel.selected_tag,
         selected_status: panel.selected_status,
+        all_feeds_href: panel.all_feeds_href,
+        all_feeds_fragment_href: panel.all_feeds_fragment_href,
         all_active: panel.all_active,
         all_tags_href: panel.all_tags_href,
         all_tags_fragment_href: panel.all_tags_fragment_href,
         read_filters: panel.read_filters,
         csrf_token: panel.csrf_token,
         notice: panel.notice,
-        feed_nav_active: true,
+        posts_nav_active: true,
+        feeds_nav_active: false,
         sources_nav_active: false,
+    })
+}
+
+fn render_feeds_panel(panel: FeedsPanel) -> Result<Response, AppError> {
+    render_template(FeedsPanelTemplate {
+        feeds: panel.feeds,
+        tags: panel.tags,
+        selected_tag: panel.selected_tag,
+        all_active: panel.all_active,
+        all_tags_href: panel.all_tags_href,
+        all_tags_fragment_href: panel.all_tags_fragment_href,
     })
 }
 
@@ -764,5 +1004,102 @@ impl IntoResponse for AppError {
             "The request could not be completed.",
         )
             .into_response()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::*;
+
+    fn feed(url: &str, name: &str, tags: &[&str]) -> FeedConfig {
+        FeedConfig {
+            url: url.to_owned(),
+            name: name.to_owned(),
+            tags: tags.iter().map(|tag| (*tag).to_owned()).collect(),
+        }
+    }
+
+    #[test]
+    fn article_urls_preserve_feed_tag_and_status_filters() {
+        let filters = ArticleFilters {
+            feed: "Example Daily".to_owned(),
+            tag: "local news".to_owned(),
+            read_filter: ReadFilter::Unread,
+        };
+
+        let url = articles_url("/articles", &filters);
+        let parsed = url::Url::parse(&format!("http://localhost{url}")).unwrap();
+        let query = parsed
+            .query_pairs()
+            .into_owned()
+            .collect::<BTreeMap<_, _>>();
+
+        assert_eq!(query.get("feed"), Some(&filters.feed));
+        assert_eq!(query.get("tag"), Some(&filters.tag));
+        assert_eq!(query.get("status").map(String::as_str), Some("unread"));
+        assert_eq!(articles_url("/", &ArticleFilters::default()), "/");
+    }
+
+    #[test]
+    fn feed_and_tag_filters_are_intersected() {
+        let feeds = vec![
+            feed("https://example.com/news", "News", &["news"]),
+            feed("https://example.com/sports", "Sports", &["sports"]),
+        ];
+        let mut filters = ArticleFilters {
+            feed: feeds[0].name.clone(),
+            tag: "news".to_owned(),
+            ..ArticleFilters::default()
+        };
+
+        assert_eq!(
+            selected_feed_urls(&feeds, &filters),
+            vec![feeds[0].url.clone()]
+        );
+
+        filters.tag = "sports".to_owned();
+        assert!(selected_feed_urls(&feeds, &filters).is_empty());
+
+        filters.feed = "Missing".to_owned();
+        filters.tag.clear();
+        assert!(selected_feed_urls(&feeds, &filters).is_empty());
+    }
+
+    #[test]
+    fn feed_directory_filters_by_tag_and_links_to_posts() {
+        let panel = feed_directory(
+            vec![
+                feed("https://example.com/zebra", "Zebra", &["news"]),
+                feed(
+                    "https://example.com/alpha",
+                    "Alpha Daily",
+                    &["news", "technology"],
+                ),
+                feed("https://example.com/sports", "Sports", &["sports"]),
+            ],
+            "news".to_owned(),
+        );
+
+        assert_eq!(
+            panel
+                .feeds
+                .iter()
+                .map(|feed| feed.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Alpha Daily", "Zebra"]
+        );
+        assert_eq!(
+            panel
+                .tags
+                .iter()
+                .map(|tag| tag.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["news", "sports", "technology"]
+        );
+        assert_eq!(panel.feeds[0].posts_href, "/?feed=Alpha+Daily");
+        assert!(panel.tags[0].active);
+        assert!(!panel.all_active);
     }
 }

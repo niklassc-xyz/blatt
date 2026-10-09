@@ -159,7 +159,7 @@ a {
   padding: 3.5rem 0 5rem;
 }
 
-.feed-page {
+.posts-page {
   padding-top: 2rem;
 }
 
@@ -238,6 +238,14 @@ button:hover {
   text-underline-offset: 0.22rem;
 }
 
+.page-intro {
+  max-width: 280px;
+  margin-bottom: 0;
+  color: var(--secondary-text);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
 .notice {
   margin: 1.25rem 0 0;
   padding: 0.75rem 0.9rem;
@@ -265,8 +273,50 @@ button:hover {
   background: var(--highlight-low);
 }
 
-.feed-page .filter-bar {
+.posts-page .filter-bar {
   margin-top: 0;
+}
+
+.feed-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.6rem;
+  padding: 0.48rem 0.7rem;
+  border-left: 3px solid var(--pine);
+  background: var(--highlight-low);
+  font-size: 0.76rem;
+}
+
+.notice + .feed-filter {
+  margin-top: 0.6rem;
+}
+
+.feed-filter > span {
+  color: var(--secondary-text);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.feed-filter strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed-filter a {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--interactive-text);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.feed-filter a:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
 }
 
 .tag-strip,
@@ -472,6 +522,90 @@ button:hover {
   max-width: 960px;
 }
 
+.feeds-filter-bar {
+  margin-top: 2rem;
+}
+
+.feed-directory {
+  margin-top: 0.35rem;
+}
+
+.feed-directory-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, auto);
+  align-items: center;
+  gap: 1.5rem;
+  margin-inline: -0.75rem;
+  padding: 1.15rem 0.75rem;
+  border-bottom: 1px solid var(--highlight-med);
+  color: inherit;
+  text-decoration: none;
+}
+
+.feed-directory-main {
+  min-width: 0;
+}
+
+.feed-directory-main h2 {
+  margin-bottom: 0.25rem;
+  font-size: 1.05rem;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+
+.feed-directory-main p {
+  overflow: hidden;
+  margin-bottom: 0;
+  color: var(--secondary-text);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed-directory-details {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.feed-directory-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.feed-directory-tags span {
+  padding: 0.18rem 0.4rem;
+  border-radius: 2px;
+  color: var(--secondary-text);
+  background: var(--highlight-low);
+  font-size: 0.65rem;
+  font-weight: 650;
+}
+
+.feed-directory-action {
+  flex: 0 0 auto;
+  color: var(--interactive-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.feed-directory-row:hover,
+.feed-directory-row:focus-visible {
+  color: var(--love);
+  background: var(--highlight-low);
+}
+
+.feed-directory-row:focus-visible {
+  outline-offset: 0;
+}
+
+.sources-page {
+  max-width: 960px;
+}
+
 .add-feed {
   display: grid;
   grid-template-columns: minmax(180px, 0.55fr) minmax(320px, 1fr);
@@ -614,7 +748,7 @@ input:focus {
     padding-top: 2.5rem;
   }
 
-  .feed-page {
+  .posts-page {
     padding-top: 1.5rem;
   }
 
@@ -653,17 +787,37 @@ input:focus {
   .feed-fields > button {
     width: 100%;
   }
+
+  .feed-directory-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.65rem;
+  }
+
+  .feed-directory-details,
+  .feed-directory-tags {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 520px) {
   .site-header {
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: 1fr auto 1fr;
     gap: 0.75rem;
     min-height: 58px;
     padding-inline: 1rem;
   }
 
   .wordmark strong {
+    display: none;
+  }
+
+  .refresh-button {
+    width: 34px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+
+  .refresh-label {
     display: none;
   }
 
@@ -678,6 +832,11 @@ input:focus {
 
   .page-header {
     align-items: flex-start;
+  }
+
+  .page-intro {
+    max-width: none;
+    text-align: left;
   }
 
   .page-header {
@@ -723,14 +882,16 @@ input:focus {
 }
 
 @media (max-width: 360px) {
-  .refresh-button {
-    width: 34px;
-    padding-inline: 0;
-    justify-content: center;
+  .site-header {
+    gap: 0.5rem;
   }
 
-  .refresh-label {
-    display: none;
+  .site-header nav {
+    gap: 0;
+  }
+
+  .site-header nav a {
+    padding-inline: 0.42rem;
   }
 }
 

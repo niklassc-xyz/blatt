@@ -7,27 +7,13 @@
   <section class="page-header">
     <div>
       <p class="eyebrow">Your subscriptions</p>
-      <h1>Sources</h1>
+      <h1>Feeds</h1>
     </div>
-    <a class="text-link" href="/">Back to headlines</a>
+    <p class="page-intro">Choose a feed to see its posts.</p>
   </section>
 
-  <section class="add-feed" aria-labelledby="add-feed-title">
-    <div>
-      <h2 id="add-feed-title">Add a source</h2>
-      <p>RSS, Atom, and YouTube channel feeds are supported.</p>
-    </div>
-    <form method="post" action="/feeds" hx-post="/feeds" hx-target="#feed-list" hx-swap="outerHTML">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label>Feed URL<input type="url" name="url" placeholder="https://example.com/feed.xml" required></label>
-      <label>Name<input type="text" name="name" placeholder="Example News" required></label>
-      <label>Tags<input type="text" name="tags" placeholder="news, technology"></label>
-      <button type="submit">Add feed</button>
-    </form>
-  </section>
-
-  {% include "feed_list.html" %}
-
-  <p class="config-note">Configuration file: <code>{{ config_path }}</code></p>
+  <div id="feeds-panel">
+    {% include "feeds_panel.html" %}
+  </div>
 </main>
 {% endblock %}

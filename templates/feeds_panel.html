@@ -1,0 +1,37 @@
+<div class="filter-bar feeds-filter-bar">
+  <nav class="tag-strip" aria-label="Filter feeds by tag">
+    <a class="tag{% if all_active %} active{% endif %}"{% if all_active %} aria-current="true"{% endif %} href="{{ all_tags_href }}" hx-get="{{ all_tags_fragment_href }}" hx-target="#feeds-panel" hx-swap="innerHTML" hx-push-url="{{ all_tags_href }}">All tags</a>
+    {% for tag in tags %}
+    <a class="tag{% if tag.active %} active{% endif %}"{% if tag.active %} aria-current="true"{% endif %} href="{{ tag.href }}" hx-get="{{ tag.fragment_href }}" hx-target="#feeds-panel" hx-swap="innerHTML" hx-push-url="{{ tag.href }}">{{ tag.name }}</a>
+    {% endfor %}
+  </nav>
+</div>
+
+<section class="feed-directory" aria-label="Feeds">
+  {% for feed in feeds %}
+  <a class="feed-directory-row" href="{{ feed.posts_href }}">
+    <div class="feed-directory-main">
+      <h2>{{ feed.name }}</h2>
+      <p>{{ feed.url }}</p>
+    </div>
+    <div class="feed-directory-details">
+      <div class="feed-directory-tags" aria-label="Tags">
+        {% for tag in feed.tags %}
+        <span>{{ tag }}</span>
+        {% endfor %}
+      </div>
+      <span class="feed-directory-action">View posts</span>
+    </div>
+  </a>
+  {% else %}
+  <div class="empty-state compact">
+    {% if selected_tag.is_empty() %}
+    <h2>No feeds configured.</h2>
+    <p>Add your first feed on the <a href="/sources">Sources</a> page.</p>
+    {% else %}
+    <h2>No feeds with this tag.</h2>
+    <p>Choose another tag or show all feeds.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>

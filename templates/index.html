@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Headlines - Local Reader{% endblock %}
+{% block title %}Posts - Local Reader{% endblock %}
 
 {% block header_actions %}
 <form id="refresh-form" method="post" action="/refresh" hx-post="/refresh" hx-target="#articles-panel" hx-swap="innerHTML">
@@ -13,7 +13,7 @@
 {% endblock %}
 
 {% block content %}
-<main id="articles-panel" class="page-shell feed-page">
+<main id="articles-panel" class="page-shell posts-page">
   {% include "articles_panel.html" %}
 </main>
 {% endblock %}

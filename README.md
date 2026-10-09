@@ -1,6 +1,6 @@
 # Local RSS Reader
 
-A small local RSS and Atom reader built with Rust, Axum, Askama, HTMX, and SQLite. It displays Media RSS, image enclosure, and YouTube thumbnails when feeds provide them, tracks read articles, and supports tag and read-status filtering. The interface follows the system light or dark preference using Rosé Pine Dawn and Rosé Pine. It fetches feeds only when you press **Refresh feeds**, then serves the cached articles without contacting external feed servers during normal browsing or filtering.
+A small local RSS and Atom reader built with Rust, Axum, Askama, HTMX, and SQLite. It displays Media RSS, image enclosure, and YouTube thumbnails when feeds provide them, tracks read articles, and supports feed, tag, and read-status filtering. The interface follows the system light or dark preference using Rosé Pine Dawn and Rosé Pine. It fetches feeds only when you press **Refresh feeds**, then serves the cached articles without contacting external feed servers during normal browsing or filtering.
 
 ## Run
 
@@ -20,7 +20,7 @@ RSS_READER_ADDR=127.0.0.1:8080 cargo run --release
 
 ## Configuration
 
-Feeds can be managed from the **Feeds** page or by editing the XDG-compliant configuration file:
+Feeds can be browsed by name and tag from the **Feeds** page. Select one to show only its posts. Subscriptions can be managed from the **Sources** page or by editing the XDG-compliant configuration file:
 
 - `$XDG_CONFIG_HOME/rss-reader/feeds.toml`
 - `~/.config/rss-reader/feeds.toml` when `XDG_CONFIG_HOME` is unset
@@ -38,6 +38,8 @@ url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCUyeluBRhGPCW4rPe_Uv
 name = "The Coding Train"
 tags = ["video", "programming"]
 ```
+
+Feed names and URLs must be unique. Name comparisons are case-insensitive.
 
 Restart the application after editing this file directly. Changes made through the web interface are persisted immediately with an atomic file replacement.
 

@@ -18,8 +18,9 @@
       <strong>local reader</strong>
     </a>
     <nav aria-label="Primary navigation">
-      <a{% if feed_nav_active %} class="active" aria-current="page"{% endif %} href="/">Feed</a>
-      <a{% if sources_nav_active %} class="active" aria-current="page"{% endif %} href="/feeds">Sources</a>
+      <a{% if posts_nav_active %} class="active" aria-current="page"{% endif %} href="/">Posts</a>
+      <a{% if feeds_nav_active %} class="active" aria-current="page"{% endif %} href="/feeds">Feeds</a>
+      <a{% if sources_nav_active %} class="active" aria-current="page"{% endif %} href="/sources">Sources</a>
     </nav>
     <div class="header-actions">
       {% block header_actions %}{% endblock %}

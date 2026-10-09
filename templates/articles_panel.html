@@ -1,3 +1,4 @@
+<input type="hidden" name="feed" value="{{ selected_feed }}" form="refresh-form">
 <input type="hidden" name="tag" value="{{ selected_tag }}" form="refresh-form">
 <input type="hidden" name="status" value="{{ selected_status }}" form="refresh-form">
 
@@ -5,14 +6,22 @@
 <p class="notice{% if notice.is_error %} notice-error{% endif %}" role="status">{{ notice.text }}</p>
 {% endif %}
 
+{% if !selected_feed.is_empty() %}
+<div class="feed-filter">
+  <span>Feed</span>
+  <strong>{{ selected_feed_name }}</strong>
+  <a href="{{ all_feeds_href }}" hx-get="{{ all_feeds_fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ all_feeds_href }}">All feeds</a>
+</div>
+{% endif %}
+
 <div class="filter-bar">
-  <nav class="tag-strip" aria-label="Filter headlines by tag">
+  <nav class="tag-strip" aria-label="Filter posts by tag">
     <a class="tag{% if all_active %} active{% endif %}"{% if all_active %} aria-current="true"{% endif %} href="{{ all_tags_href }}" hx-get="{{ all_tags_fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ all_tags_href }}">All tags</a>
     {% for tag in tags %}
     <a class="tag{% if tag.active %} active{% endif %}"{% if tag.active %} aria-current="true"{% endif %} href="{{ tag.href }}" hx-get="{{ tag.fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ tag.href }}">{{ tag.name }}</a>
     {% endfor %}
   </nav>
-  <nav class="read-filter" aria-label="Filter headlines by read status">
+  <nav class="read-filter" aria-label="Filter posts by read status">
     <span>Status</span>
     {% for filter in read_filters %}
     <a class="status-option{% if filter.active %} active{% endif %}"{% if filter.active %} aria-current="true"{% endif %} href="{{ filter.href }}" hx-get="{{ filter.fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ filter.href }}">{{ filter.name }}</a>
@@ -29,6 +38,7 @@
         <time>{{ article.published }}</time>
         <form class="read-form" method="post" action="/articles/read" hx-post="/articles/read" hx-target="#articles-panel" hx-swap="innerHTML">
           <input type="hidden" name="url" value="{{ article.url }}">
+          <input type="hidden" name="feed" value="{{ selected_feed }}">
           <input type="hidden" name="tag" value="{{ selected_tag }}">
           <input type="hidden" name="status" value="{{ selected_status }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -47,7 +57,7 @@
   {% else %}
   <div class="empty-state">
     <p class="empty-kicker">All caught up</p>
-    <h2>No cached articles to show.</h2>
+    <h2>No cached posts to show.</h2>
     <p>Add a feed if needed, then use <strong>Refresh feeds</strong> to retrieve the latest entries.</p>
   </div>
   {% endfor %}
