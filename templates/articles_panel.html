@@ -5,6 +5,8 @@
   </div>
   <form method="post" action="/refresh" hx-post="/refresh" hx-target="#articles-panel" hx-swap="innerHTML">
     <input type="hidden" name="tag" value="{{ selected_tag }}">
+    <input type="hidden" name="status" value="{{ selected_status }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <button class="refresh-button" type="submit">
       <span aria-hidden="true">&#8635;</span> Refresh feeds
     </button>
@@ -15,23 +17,39 @@
 <p class="notice{% if notice.is_error %} notice-error{% endif %}" role="status">{{ notice.text }}</p>
 {% endif %}
 
-<nav class="tag-strip" aria-label="Filter headlines by tag">
-  <a class="tag{% if all_active %} active{% endif %}" href="/" hx-get="/articles" hx-target="#articles-panel" hx-push-url="/">All</a>
-  {% for tag in tags %}
-  <a class="tag{% if tag.active %} active{% endif %}" href="/?tag={{ tag.encoded }}" hx-get="/articles?tag={{ tag.encoded }}" hx-target="#articles-panel" hx-push-url="/?tag={{ tag.encoded }}">{{ tag.name }}</a>
-  {% endfor %}
-</nav>
+<div class="filter-bar">
+  <nav class="tag-strip" aria-label="Filter headlines by tag">
+    <a class="tag{% if all_active %} active{% endif %}" href="{{ all_tags_href }}" hx-get="{{ all_tags_fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ all_tags_href }}">All tags</a>
+    {% for tag in tags %}
+    <a class="tag{% if tag.active %} active{% endif %}" href="{{ tag.href }}" hx-get="{{ tag.fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ tag.href }}">{{ tag.name }}</a>
+    {% endfor %}
+  </nav>
+  <nav class="read-filter" aria-label="Filter headlines by read status">
+    <span>Status</span>
+    {% for filter in read_filters %}
+    <a class="status-option{% if filter.active %} active{% endif %}" href="{{ filter.href }}" hx-get="{{ filter.fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ filter.href }}">{{ filter.name }}</a>
+    {% endfor %}
+  </nav>
+</div>
 
 <section class="article-list" aria-label="Articles">
   {% for article in articles %}
-  <article class="article-row{% if article.has_thumbnail %} with-thumbnail{% endif %}">
+  <article class="article-row{% if article.has_thumbnail %} with-thumbnail{% endif %}{% if article.is_read %} is-read{% endif %}">
     <div class="article-meta">
       <span class="source">{{ article.source }}</span>
       <time>{{ article.published }}</time>
+      <form class="read-form" method="post" action="/articles/read" hx-post="/articles/read" hx-target="#articles-panel" hx-swap="innerHTML">
+        <input type="hidden" name="url" value="{{ article.url }}">
+        <input type="hidden" name="tag" value="{{ selected_tag }}">
+        <input type="hidden" name="status" value="{{ selected_status }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="action" value="{% if article.is_read %}unread{% else %}read{% endif %}">
+        <button class="read-toggle" type="submit">{% if article.is_read %}Mark unread{% else %}Mark read{% endif %}</button>
+      </form>
     </div>
-    <h2><a href="{{ article.url }}" rel="noopener noreferrer">{{ article.title }}</a></h2>
+    <h2><a href="{{ article.open_url }}" rel="nofollow noopener noreferrer" referrerpolicy="no-referrer" data-article-open>{{ article.title }}</a></h2>
     {% if article.has_thumbnail %}
-    <a class="article-thumbnail" href="{{ article.url }}" rel="noopener noreferrer" tabindex="-1" aria-hidden="true">
+    <a class="article-thumbnail" href="{{ article.open_url }}" rel="nofollow noopener noreferrer" referrerpolicy="no-referrer" tabindex="-1" aria-hidden="true" data-article-open>
       <img src="{{ article.thumbnail_url }}" alt="" width="320" height="180" loading="lazy" decoding="async" referrerpolicy="no-referrer">
     </a>
     {% endif %}

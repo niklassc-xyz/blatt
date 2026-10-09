@@ -1,6 +1,6 @@
 # Local RSS Reader
 
-A small local RSS and Atom reader built with Rust, Axum, Askama, HTMX, and SQLite. It displays Media RSS, image enclosure, and YouTube thumbnails when feeds provide them. It fetches feeds only when you press **Refresh feeds**, then serves the cached articles without contacting external feed servers during normal browsing or filtering.
+A small local RSS and Atom reader built with Rust, Axum, Askama, HTMX, and SQLite. It displays Media RSS, image enclosure, and YouTube thumbnails when feeds provide them, tracks read articles, and supports tag and read-status filtering. It fetches feeds only when you press **Refresh feeds**, then serves the cached articles without contacting external feed servers during normal browsing or filtering.
 
 ## Run
 

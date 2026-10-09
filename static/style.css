@@ -158,13 +158,47 @@ button:focus-visible {
   background: #f0ddd5;
 }
 
+.filter-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
 .tag-strip {
   display: flex;
   gap: 0.5rem;
   overflow-x: auto;
   padding: 1.1rem 0;
-  border-bottom: 1px solid var(--line);
   scrollbar-width: thin;
+}
+
+.read-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  white-space: nowrap;
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.read-filter > span {
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.status-option {
+  padding-block: 0.25rem;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+.status-option:hover,
+.status-option.active {
+  color: var(--accent-dark);
+  border-color: var(--accent);
 }
 
 .tag {
@@ -212,6 +246,16 @@ button:focus-visible {
   object-fit: cover;
 }
 
+.article-row.is-read h2,
+.article-row.is-read .article-meta {
+  color: var(--muted);
+}
+
+.article-row.is-read .article-thumbnail img {
+  opacity: 0.68;
+  filter: grayscale(0.55);
+}
+
 .article-meta {
   display: flex;
   flex-direction: column;
@@ -226,6 +270,28 @@ button:focus-visible {
 .source {
   color: var(--accent-dark);
   font-weight: 800;
+}
+
+.read-form {
+  margin-top: 0.35rem;
+}
+
+.read-toggle {
+  min-height: 0;
+  padding: 0.28rem 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.read-toggle:hover,
+.read-toggle:focus-visible {
+  color: var(--accent-dark);
+  background: transparent;
 }
 
 .article-row h2 {
@@ -416,6 +482,24 @@ input:focus {
     flex-direction: row;
     flex-wrap: wrap;
     gap: 0.5rem 1rem;
+  }
+
+  .read-form {
+    margin-top: -0.25rem;
+  }
+
+  .filter-bar {
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding-bottom: 0.9rem;
+  }
+
+  .tag-strip {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .read-filter {
+    padding-top: 0.9rem;
   }
 
   .article-thumbnail {

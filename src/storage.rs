@@ -27,6 +27,15 @@ pub struct StoredArticle {
     pub source_name: String,
     pub published_at: i64,
     pub thumbnail_url: Option<String>,
+    pub is_read: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ReadFilter {
+    #[default]
+    All,
+    Unread,
+    Read,
 }
 
 impl Storage {
@@ -76,6 +85,16 @@ impl Storage {
                 .await?;
         }
         sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS read_articles (
+                article_url TEXT PRIMARY KEY NOT NULL,
+                read_at INTEGER NOT NULL
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        sqlx::query(
             "CREATE INDEX IF NOT EXISTS articles_feed_date ON articles(feed_url, published_at DESC)",
         )
         .execute(&self.pool)
@@ -123,6 +142,7 @@ impl Storage {
     pub async fn list_articles(
         &self,
         feed_urls: &[String],
+        read_filter: ReadFilter,
     ) -> Result<Vec<StoredArticle>, sqlx::Error> {
         if feed_urls.is_empty() {
             return Ok(Vec::new());
@@ -130,45 +150,121 @@ impl Storage {
 
         let mut query = QueryBuilder::<Sqlite>::new(
             r#"
-            SELECT title, url, source_name, published_at, selected_thumbnail_url FROM (
-                SELECT title, url, source_name, published_at, thumbnail_url,
-                    FIRST_VALUE(thumbnail_url) OVER (
-                        PARTITION BY url ORDER BY
-                            (thumbnail_url IS NULL) ASC,
-                            published_at DESC,
-                            feed_url ASC
+            SELECT title, url, source_name, published_at, selected_thumbnail_url, is_read FROM (
+                SELECT a.title, a.url, a.source_name, a.published_at, a.thumbnail_url,
+                    (r.article_url IS NOT NULL) AS is_read,
+                    FIRST_VALUE(a.thumbnail_url) OVER (
+                        PARTITION BY a.url ORDER BY
+                            (a.thumbnail_url IS NULL) ASC,
+                            a.published_at DESC,
+                            a.feed_url ASC
                     ) AS selected_thumbnail_url,
                     ROW_NUMBER() OVER (
-                        PARTITION BY url ORDER BY
-                            published_at DESC,
-                            feed_url ASC
+                        PARTITION BY a.url ORDER BY
+                            a.published_at DESC,
+                            a.feed_url ASC
                     ) AS result_order
-                FROM articles WHERE feed_url IN (
+                FROM articles a
+                LEFT JOIN read_articles r ON r.article_url = a.url
+                WHERE a.feed_url IN (
             "#,
         );
         let mut separated = query.separated(", ");
         for url in feed_urls {
             separated.push_bind(url);
         }
-        separated
-            .push_unseparated(") ) WHERE result_order = 1 ORDER BY published_at DESC, title ASC");
+        separated.push_unseparated(")");
+        match read_filter {
+            ReadFilter::All => {}
+            ReadFilter::Unread => {
+                query.push(" AND r.article_url IS NULL");
+            }
+            ReadFilter::Read => {
+                query.push(" AND r.article_url IS NOT NULL");
+            }
+        }
+        query.push(" ) WHERE result_order = 1 ORDER BY published_at DESC, title ASC");
 
         let rows = query
-            .build_query_as::<(String, String, String, i64, Option<String>)>()
+            .build_query_as::<(String, String, String, i64, Option<String>, i64)>()
             .fetch_all(&self.pool)
             .await?;
         Ok(rows
             .into_iter()
             .map(
-                |(title, url, source_name, published_at, thumbnail_url)| StoredArticle {
+                |(title, url, source_name, published_at, thumbnail_url, is_read)| StoredArticle {
                     title,
                     url,
                     source_name,
                     published_at,
                     thumbnail_url,
+                    is_read: is_read != 0,
                 },
             )
             .collect())
+    }
+
+    pub async fn set_article_read(
+        &self,
+        article_url: &str,
+        read: bool,
+    ) -> Result<bool, sqlx::Error> {
+        let mut transaction = self.pool.begin().await?;
+        let exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM articles WHERE url = ?)")
+                .bind(article_url)
+                .fetch_one(&mut *transaction)
+                .await?;
+        if !exists {
+            transaction.rollback().await?;
+            return Ok(false);
+        }
+
+        if read {
+            sqlx::query(
+                r#"
+                INSERT INTO read_articles (article_url, read_at) VALUES (?, unixepoch())
+                ON CONFLICT(article_url) DO UPDATE SET read_at = excluded.read_at
+                "#,
+            )
+            .bind(article_url)
+            .execute(&mut *transaction)
+            .await?;
+        } else {
+            sqlx::query("DELETE FROM read_articles WHERE article_url = ?")
+                .bind(article_url)
+                .execute(&mut *transaction)
+                .await?;
+        }
+        transaction.commit().await?;
+        Ok(true)
+    }
+
+    pub async fn mark_article_read(
+        &self,
+        article_url: &str,
+    ) -> Result<Option<String>, sqlx::Error> {
+        let mut transaction = self.pool.begin().await?;
+        let destination = sqlx::query_scalar::<_, String>(
+            "SELECT url FROM articles WHERE url = ? ORDER BY fetched_at DESC LIMIT 1",
+        )
+        .bind(article_url)
+        .fetch_optional(&mut *transaction)
+        .await?;
+
+        if destination.is_some() {
+            sqlx::query(
+                r#"
+                INSERT INTO read_articles (article_url, read_at) VALUES (?, unixepoch())
+                ON CONFLICT(article_url) DO UPDATE SET read_at = excluded.read_at
+                "#,
+            )
+            .bind(article_url)
+            .execute(&mut *transaction)
+            .await?;
+        }
+        transaction.commit().await?;
+        Ok(destination)
     }
 
     pub async fn delete_feed(&self, feed_url: &str) -> Result<(), sqlx::Error> {
@@ -214,7 +310,10 @@ mod tests {
             date_is_fallback: true,
             thumbnail_url: Some("https://example.com/original.jpg".to_owned()),
         };
-        storage.upsert_articles(&[article.clone()]).await.unwrap();
+        storage
+            .upsert_articles(std::slice::from_ref(&article))
+            .await
+            .unwrap();
         article.title = "Updated".to_owned();
         article.published_at = 2;
         article.fetched_at = 2;
@@ -222,7 +321,7 @@ mod tests {
         storage.upsert_articles(&[article]).await.unwrap();
 
         let articles = storage
-            .list_articles(&["https://example.com/feed".to_owned()])
+            .list_articles(&["https://example.com/feed".to_owned()], ReadFilter::All)
             .await
             .unwrap();
         assert_eq!(articles.len(), 1);
@@ -260,14 +359,20 @@ mod tests {
         storage.upsert_articles(&[first, second]).await.unwrap();
 
         let all = storage
-            .list_articles(&[
-                "https://example.com/first.xml".to_owned(),
-                "https://example.com/second.xml".to_owned(),
-            ])
+            .list_articles(
+                &[
+                    "https://example.com/first.xml".to_owned(),
+                    "https://example.com/second.xml".to_owned(),
+                ],
+                ReadFilter::All,
+            )
             .await
             .unwrap();
         let second_only = storage
-            .list_articles(&["https://example.com/second.xml".to_owned()])
+            .list_articles(
+                &["https://example.com/second.xml".to_owned()],
+                ReadFilter::All,
+            )
             .await
             .unwrap();
         assert_eq!(all.len(), 1);
@@ -279,6 +384,77 @@ mod tests {
         );
         assert_eq!(second_only.len(), 1);
         assert_eq!(second_only[0].source_name, "Second");
+    }
+
+    #[tokio::test]
+    async fn read_state_persists_across_refreshes_and_filters() {
+        let directory = tempfile::tempdir().unwrap();
+        let storage = Storage::open(&directory.path().join("articles.db"))
+            .await
+            .unwrap();
+        let article = Article {
+            dedupe_key: "https://example.com/read-me".to_owned(),
+            feed_url: "https://example.com/feed.xml".to_owned(),
+            title: "Read me".to_owned(),
+            url: "https://example.com/read-me".to_owned(),
+            source_name: "Example".to_owned(),
+            published_at: 1,
+            fetched_at: 1,
+            date_is_fallback: false,
+            thumbnail_url: None,
+        };
+        let feed_urls = ["https://example.com/feed.xml".to_owned()];
+        storage
+            .upsert_articles(std::slice::from_ref(&article))
+            .await
+            .unwrap();
+
+        assert!(storage.set_article_read(&article.url, true).await.unwrap());
+        storage
+            .upsert_articles(std::slice::from_ref(&article))
+            .await
+            .unwrap();
+        assert_eq!(
+            storage
+                .list_articles(&feed_urls, ReadFilter::Read)
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            storage
+                .list_articles(&feed_urls, ReadFilter::Unread)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            storage
+                .list_articles(&feed_urls, ReadFilter::All)
+                .await
+                .unwrap()[0]
+                .is_read
+        );
+
+        assert!(storage.set_article_read(&article.url, false).await.unwrap());
+        assert_eq!(
+            storage.mark_article_read(&article.url).await.unwrap(),
+            Some(article.url.clone())
+        );
+        assert_eq!(
+            storage
+                .mark_article_read("https://example.com/missing")
+                .await
+                .unwrap(),
+            None
+        );
+        assert!(
+            !storage
+                .set_article_read("https://example.com/missing", true)
+                .await
+                .unwrap()
+        );
     }
 
     #[tokio::test]
@@ -320,5 +496,12 @@ mod tests {
         .await
         .unwrap();
         assert!(has_thumbnail_column);
+        let has_read_table: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'read_articles')",
+        )
+        .fetch_one(&storage.pool)
+        .await
+        .unwrap();
+        assert!(has_read_table);
     }
 }
