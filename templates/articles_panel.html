@@ -22,7 +22,6 @@
     {% endfor %}
   </nav>
   <nav class="read-filter" aria-label="Filter posts by read status">
-    <span>Status</span>
     {% for filter in read_filters %}
     <a class="status-option{% if filter.active %} active{% endif %}"{% if filter.active %} aria-current="true"{% endif %} href="{{ filter.href }}" hx-get="{{ filter.fragment_href }}" hx-target="#articles-panel" hx-push-url="{{ filter.href }}">{{ filter.name }}</a>
     {% endfor %}

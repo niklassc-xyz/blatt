@@ -338,15 +338,6 @@ button:hover {
   border-left: 1px solid var(--highlight-med);
 }
 
-.read-filter > span {
-  padding-inline: 0.35rem;
-  color: var(--secondary-text);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .tag,
 .status-option {
   flex: 0 0 auto;
