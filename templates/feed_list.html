@@ -1,0 +1,31 @@
+<section id="feed-list" class="feed-list" aria-labelledby="feed-list-title">
+  <div class="section-heading">
+    <p class="section-number">02</p>
+    <h2 id="feed-list-title">Current sources</h2>
+  </div>
+
+  {% if !notice.text.is_empty() %}
+  <p class="notice{% if notice.is_error %} notice-error{% endif %}" role="status">{{ notice.text }}</p>
+  {% endif %}
+
+  {% for feed in feeds %}
+  <article class="feed-card">
+    <form class="feed-fields" method="post" action="/feeds/update" hx-post="/feeds/update" hx-target="#feed-list" hx-swap="outerHTML">
+      <input type="hidden" name="original_url" value="{{ feed.url }}">
+      <label>Name<input type="text" name="name" value="{{ feed.name }}" required></label>
+      <label>Feed URL<input type="url" name="url" value="{{ feed.url }}" required></label>
+      <label>Tags<input type="text" name="tags" value="{{ feed.tags }}" placeholder="Comma-separated"></label>
+      <button class="small-button" type="submit">Save changes</button>
+    </form>
+    <form method="post" action="/feeds/delete" hx-post="/feeds/delete" hx-target="#feed-list" hx-swap="outerHTML" hx-confirm="Delete {{ feed.name }}?">
+      <input type="hidden" name="url" value="{{ feed.url }}">
+      <button class="danger-button" type="submit">Delete</button>
+    </form>
+  </article>
+  {% else %}
+  <div class="empty-state compact">
+    <h3>No feeds configured.</h3>
+    <p>Add your first source above or edit the TOML configuration file directly.</p>
+  </div>
+  {% endfor %}
+</section>

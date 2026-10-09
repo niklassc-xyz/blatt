@@ -1,0 +1,41 @@
+<section class="edition-header" aria-labelledby="page-title">
+  <div>
+    <p class="eyebrow">Your local edition</p>
+    <h1 id="page-title">Latest headlines</h1>
+  </div>
+  <form method="post" action="/refresh" hx-post="/refresh" hx-target="#articles-panel" hx-swap="innerHTML">
+    <input type="hidden" name="tag" value="{{ selected_tag }}">
+    <button class="refresh-button" type="submit">
+      <span aria-hidden="true">&#8635;</span> Refresh feeds
+    </button>
+  </form>
+</section>
+
+{% if !notice.text.is_empty() %}
+<p class="notice{% if notice.is_error %} notice-error{% endif %}" role="status">{{ notice.text }}</p>
+{% endif %}
+
+<nav class="tag-strip" aria-label="Filter headlines by tag">
+  <a class="tag{% if all_active %} active{% endif %}" href="/" hx-get="/articles" hx-target="#articles-panel" hx-push-url="/">All</a>
+  {% for tag in tags %}
+  <a class="tag{% if tag.active %} active{% endif %}" href="/?tag={{ tag.encoded }}" hx-get="/articles?tag={{ tag.encoded }}" hx-target="#articles-panel" hx-push-url="/?tag={{ tag.encoded }}">{{ tag.name }}</a>
+  {% endfor %}
+</nav>
+
+<section class="article-list" aria-label="Articles">
+  {% for article in articles %}
+  <article class="article-row">
+    <div class="article-meta">
+      <span class="source">{{ article.source }}</span>
+      <time>{{ article.published }}</time>
+    </div>
+    <h2><a href="{{ article.url }}" rel="noopener noreferrer">{{ article.title }}</a></h2>
+  </article>
+  {% else %}
+  <div class="empty-state">
+    <p class="empty-kicker">Nothing on the wire</p>
+    <h2>No cached articles to show.</h2>
+    <p>Add a feed if needed, then use <strong>Refresh feeds</strong> to retrieve the latest entries.</p>
+  </div>
+  {% endfor %}
+</section>

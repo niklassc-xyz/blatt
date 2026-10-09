@@ -1,0 +1,25 @@
+[package]
+name = "rss-reader"
+version = "0.1.0"
+edition = "2024"
+description = "A lightweight, local RSS and Atom reader"
+license = "GPL-3.0-only"
+
+[dependencies]
+askama = "0.14"
+axum = { version = "0.8", features = ["form", "query"] }
+chrono = "0.4"
+feed-rs = "2.3"
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["brotli", "deflate", "gzip", "http2", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite"] }
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync"] }
+toml = "0.9"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2"
+
+[dev-dependencies]
+tempfile = "3"
