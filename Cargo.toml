@@ -1,8 +1,8 @@
 [package]
-name = "rss-reader"
+name = "blatt"
 version = "0.1.0"
 edition = "2024"
-description = "A lightweight, local RSS and Atom reader"
+description = "Blatt, a lightweight local RSS and Atom reader"
 license = "GPL-3.0-only"
 
 [dependencies]

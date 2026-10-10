@@ -34,7 +34,7 @@ pub struct FeedFailure {
 impl FeedCollector {
     pub fn new() -> Result<Self, reqwest::Error> {
         let client = Client::builder()
-            .user_agent(concat!("rss-reader/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("blatt/", env!("CARGO_PKG_VERSION")))
             .timeout(Duration::from_secs(20))
             .build()?;
         Ok(Self { client })

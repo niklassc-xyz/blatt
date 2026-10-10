@@ -309,7 +309,7 @@ pub async fn serve(address: SocketAddr, paths: AppPaths) -> Result<(), Box<dyn s
         .with_state(state);
 
     let listener = TcpListener::bind(address).await?;
-    info!(%address, "RSS reader listening");
+    info!(%address, "Blatt listening");
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;

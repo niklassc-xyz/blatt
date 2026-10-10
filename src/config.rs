@@ -39,10 +39,29 @@ impl AppPaths {
             .or_else(|| home.map(|path| path.join(".local/share")))
             .ok_or(ConfigError::MissingHome)?;
 
-        Ok(Self {
-            config_file: config_home.join("rss-reader/feeds.toml"),
-            database_file: data_home.join("rss-reader/articles.db"),
-        })
+        Ok(Self::for_homes(&config_home, &data_home))
+    }
+
+    fn for_homes(config_home: &Path, data_home: &Path) -> Self {
+        let config_file = config_home.join("blatt/feeds.toml");
+        let database_file = data_home.join("blatt/articles.db");
+        let legacy_config_file = config_home.join("rss-reader/feeds.toml");
+        let legacy_database_file = data_home.join("rss-reader/articles.db");
+        let use_legacy_paths = !config_file.exists()
+            && !database_file.exists()
+            && (legacy_config_file.exists() || legacy_database_file.exists());
+
+        if use_legacy_paths {
+            Self {
+                config_file: legacy_config_file,
+                database_file: legacy_database_file,
+            }
+        } else {
+            Self {
+                config_file,
+                database_file,
+            }
+        }
     }
 }
 
@@ -244,6 +263,36 @@ pub enum ConfigError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn application_paths_use_the_blatt_directory() {
+        let directory = tempfile::tempdir().unwrap();
+        let config_home = directory.path().join("config");
+        let data_home = directory.path().join("data");
+
+        let paths = AppPaths::for_homes(&config_home, &data_home);
+
+        assert_eq!(paths.config_file, config_home.join("blatt/feeds.toml"));
+        assert_eq!(paths.database_file, data_home.join("blatt/articles.db"));
+    }
+
+    #[test]
+    fn application_paths_preserve_an_existing_legacy_installation() {
+        let directory = tempfile::tempdir().unwrap();
+        let config_home = directory.path().join("config");
+        let data_home = directory.path().join("data");
+        let legacy_config = config_home.join("rss-reader/feeds.toml");
+        fs::create_dir_all(legacy_config.parent().unwrap()).unwrap();
+        fs::write(&legacy_config, "").unwrap();
+
+        let paths = AppPaths::for_homes(&config_home, &data_home);
+
+        assert_eq!(paths.config_file, legacy_config);
+        assert_eq!(
+            paths.database_file,
+            data_home.join("rss-reader/articles.db")
+        );
+    }
 
     #[test]
     fn configuration_round_trips_and_normalizes() {

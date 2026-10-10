@@ -1,6 +1,6 @@
-# Local RSS Reader
+# Blatt
 
-A small local RSS and Atom reader built with Rust, Axum, Askama, HTMX, and SQLite. It displays Media RSS, image enclosure, and YouTube thumbnails when feeds provide them, tracks read articles, and supports feed, tag, and read-status filtering. The interface follows the system light or dark preference using Rosé Pine Dawn and Rosé Pine. It fetches feeds only when you press **Refresh feeds**, then serves the cached articles without contacting external feed servers during normal browsing or filtering.
+Blatt is a small local RSS and Atom reader built with Rust, Axum, Askama, HTMX, and SQLite. It displays Media RSS, image enclosure, and YouTube thumbnails when feeds provide them, tracks read articles, and supports feed, tag, and read-status filtering. The interface follows the system light or dark preference using Rosé Pine Dawn and Rosé Pine. It fetches feeds only when you press **Refresh feeds**, then serves the cached articles without contacting external feed servers during normal browsing or filtering.
 
 ## Run
 
@@ -12,18 +12,18 @@ cargo run --release
 
 Open <http://127.0.0.1:3000>. Stop the server with `Ctrl+C`.
 
-The application binds only to localhost by default. Set `RSS_READER_ADDR` to use another address:
+The application binds only to localhost by default. Set `BLATT_ADDR` to use another address:
 
 ```sh
-RSS_READER_ADDR=127.0.0.1:8080 cargo run --release
+BLATT_ADDR=127.0.0.1:8080 cargo run --release
 ```
 
 ## Configuration
 
 Feeds can be browsed by name and tag from the **Feeds** page. Select one to show only its posts. Subscriptions can be managed from the **Sources** page or by editing the XDG-compliant configuration file:
 
-- `$XDG_CONFIG_HOME/rss-reader/feeds.toml`
-- `~/.config/rss-reader/feeds.toml` when `XDG_CONFIG_HOME` is unset
+- `$XDG_CONFIG_HOME/blatt/feeds.toml`
+- `~/.config/blatt/feeds.toml` when `XDG_CONFIG_HOME` is unset
 
 The file is created automatically on first start. Its format is:
 
@@ -43,7 +43,7 @@ Feed names and URLs must be unique. Name comparisons are case-insensitive.
 
 Restart the application after editing this file directly. Changes made through the web interface are persisted immediately with an atomic file replacement.
 
-Cached articles are stored in `$XDG_DATA_HOME/rss-reader/articles.db`, or `~/.local/share/rss-reader/articles.db` when `XDG_DATA_HOME` is unset. Removing a feed through the web interface also removes its cached articles. No periodic background refresh is performed.
+Cached articles are stored in `$XDG_DATA_HOME/blatt/articles.db`, or `~/.local/share/blatt/articles.db` when `XDG_DATA_HOME` is unset. Existing installations continue using data from the former `rss-reader` directories when no Blatt data exists yet. Removing a feed through the web interface also removes its cached articles. No periodic background refresh is performed.
 
 ## Development
 
