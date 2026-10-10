@@ -408,6 +408,10 @@ button:hover {
   flex: 0 0 auto;
 }
 
+.article-meta .relative-time {
+  color: var(--muted-tone);
+}
+
 .read-form {
   position: relative;
   z-index: 2;

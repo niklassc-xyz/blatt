@@ -8,7 +8,7 @@ use axum::{
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use serde::Deserialize;
 use thiserror::Error;
 use tokio::{net::TcpListener, sync::Mutex};
@@ -112,6 +112,8 @@ struct ArticleView {
     url: String,
     source: String,
     published: String,
+    published_datetime: String,
+    published_relative: String,
     thumbnail_url: String,
     has_thumbnail: bool,
     open_url: String,
@@ -573,12 +575,13 @@ async fn build_articles_panel(
 ) -> Result<ArticlesPanel, AppError> {
     let feeds = state.config.feeds()?;
     let feed_urls = selected_feed_urls(&feeds, filters);
+    let now = Utc::now();
     let articles = state
         .storage
         .list_articles(&feed_urls, filters.read_filter)
         .await?
         .into_iter()
-        .map(|article| article_view(article, &state.csrf_token))
+        .map(|article| article_view(article, &state.csrf_token, now))
         .collect();
     let selected_feed_name = if filters.feed.is_empty() {
         String::new()
@@ -647,11 +650,12 @@ async fn build_articles_panel(
     })
 }
 
-fn article_view(article: StoredArticle, csrf_token: &str) -> ArticleView {
-    let published = DateTime::<Utc>::from_timestamp(article.published_at, 0)
-        .unwrap_or(DateTime::<Utc>::UNIX_EPOCH)
-        .format("%b %-d, %Y, %H:%M UTC")
-        .to_string();
+fn article_view(article: StoredArticle, csrf_token: &str, now: DateTime<Utc>) -> ArticleView {
+    let published_at = DateTime::<Utc>::from_timestamp(article.published_at, 0)
+        .unwrap_or(DateTime::<Utc>::UNIX_EPOCH);
+    let published = published_at.format("%b %-d, %Y, %H:%M UTC").to_string();
+    let published_datetime = published_at.to_rfc3339_opts(SecondsFormat::Secs, true);
+    let published_relative = relative_time(published_at, now);
     let thumbnail_url = article.thumbnail_url.unwrap_or_default();
     let mut query = url::form_urlencoded::Serializer::new(String::new());
     query.append_pair("url", &article.url);
@@ -662,10 +666,41 @@ fn article_view(article: StoredArticle, csrf_token: &str) -> ArticleView {
         url: article.url,
         source: article.source_name,
         published,
+        published_datetime,
+        published_relative,
         has_thumbnail: !thumbnail_url.is_empty(),
         thumbnail_url,
         open_url,
         is_read: article.is_read,
+    }
+}
+
+fn relative_time(published_at: DateTime<Utc>, now: DateTime<Utc>) -> String {
+    let seconds = now.signed_duration_since(published_at).num_seconds();
+    if seconds.unsigned_abs() < 60 {
+        return "just now".to_owned();
+    }
+
+    let elapsed = seconds.unsigned_abs();
+    let (value, unit) = if elapsed < 60 * 60 {
+        (elapsed / 60, "minute")
+    } else if elapsed < 24 * 60 * 60 {
+        (elapsed / (60 * 60), "hour")
+    } else if elapsed < 7 * 24 * 60 * 60 {
+        (elapsed / (24 * 60 * 60), "day")
+    } else if elapsed < 30 * 24 * 60 * 60 {
+        (elapsed / (7 * 24 * 60 * 60), "week")
+    } else if elapsed < 365 * 24 * 60 * 60 {
+        (elapsed / (30 * 24 * 60 * 60), "month")
+    } else {
+        (elapsed / (365 * 24 * 60 * 60), "year")
+    };
+    let plural = if value == 1 { "" } else { "s" };
+
+    if seconds < 0 {
+        format!("in {value} {unit}{plural}")
+    } else {
+        format!("{value} {unit}{plural} ago")
     }
 }
 
@@ -1011,6 +1046,8 @@ impl IntoResponse for AppError {
 mod tests {
     use std::collections::BTreeMap;
 
+    use chrono::Duration;
+
     use super::*;
 
     fn feed(url: &str, name: &str, tags: &[&str]) -> FeedConfig {
@@ -1019,6 +1056,27 @@ mod tests {
             name: name.to_owned(),
             tags: tags.iter().map(|tag| (*tag).to_owned()).collect(),
         }
+    }
+
+    #[test]
+    fn relative_times_use_readable_units_and_handle_future_dates() {
+        let now = DateTime::<Utc>::from_timestamp(2_000_000_000, 0).unwrap();
+
+        assert_eq!(relative_time(now - Duration::seconds(59), now), "just now");
+        assert_eq!(
+            relative_time(now - Duration::minutes(1), now),
+            "1 minute ago"
+        );
+        assert_eq!(
+            relative_time(now - Duration::minutes(45), now),
+            "45 minutes ago"
+        );
+        assert_eq!(relative_time(now - Duration::hours(2), now), "2 hours ago");
+        assert_eq!(relative_time(now - Duration::days(3), now), "3 days ago");
+        assert_eq!(relative_time(now - Duration::weeks(2), now), "2 weeks ago");
+        assert_eq!(relative_time(now - Duration::days(90), now), "3 months ago");
+        assert_eq!(relative_time(now - Duration::days(730), now), "2 years ago");
+        assert_eq!(relative_time(now + Duration::hours(3), now), "in 3 hours");
     }
 
     #[test]

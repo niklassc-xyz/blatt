@@ -32,9 +32,10 @@
   {% for article in articles %}
   <article class="article-row{% if article.has_thumbnail %} with-thumbnail{% endif %}{% if article.is_read %} is-read{% endif %}">
     <div class="article-main">
-      <div class="article-meta">
-        <span class="source">{{ article.source }}</span>
-        <time>{{ article.published }}</time>
+        <div class="article-meta">
+          <span class="source">{{ article.source }}</span>
+          <time datetime="{{ article.published_datetime }}">{{ article.published }}</time>
+          <time class="relative-time" datetime="{{ article.published_datetime }}">{{ article.published_relative }}</time>
         <form class="read-form" method="post" action="/articles/read" hx-post="/articles/read" hx-target="#articles-panel" hx-swap="innerHTML">
           <input type="hidden" name="url" value="{{ article.url }}">
           <input type="hidden" name="feed" value="{{ selected_feed }}">
