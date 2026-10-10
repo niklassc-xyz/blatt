@@ -15,7 +15,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let paths = AppPaths::discover()?;
     let address = env::var("BLATT_ADDR")
-        .or_else(|_| env::var("RSS_READER_ADDR"))
         .unwrap_or_else(|_| "127.0.0.1:3000".to_owned())
         .parse::<SocketAddr>()?;
 

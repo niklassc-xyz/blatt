@@ -43,7 +43,7 @@ Feed names and URLs must be unique. Name comparisons are case-insensitive.
 
 Restart the application after editing this file directly. Changes made through the web interface are persisted immediately with an atomic file replacement.
 
-Cached articles are stored in `$XDG_DATA_HOME/blatt/articles.db`, or `~/.local/share/blatt/articles.db` when `XDG_DATA_HOME` is unset. Existing installations continue using data from the former `rss-reader` directories when no Blatt data exists yet. Removing a feed through the web interface also removes its cached articles. No periodic background refresh is performed.
+Cached articles are stored in `$XDG_DATA_HOME/blatt/articles.db`, or `~/.local/share/blatt/articles.db` when `XDG_DATA_HOME` is unset. Removing a feed through the web interface also removes its cached articles. No periodic background refresh is performed.
 
 ## Development
 
