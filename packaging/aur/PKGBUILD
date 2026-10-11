@@ -44,9 +44,9 @@ check() {
 
 package() {
     cd "$srcdir/blatt"
-    export RUSTUP_TOOLCHAIN=stable
-    export CARGO_TARGET_DIR=target
-    make PREFIX=/usr DESTDIR="$pkgdir" install
+    install -Dm755 target/release/blatt "$pkgdir/usr/bin/blatt"
+    install -Dm644 systemd/blatt.service \
+        "$pkgdir/usr/lib/systemd/user/blatt.service"
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
     install -Dm644 THIRD_PARTY_LICENSES.md \
         "$pkgdir/usr/share/licenses/$pkgname/THIRD_PARTY_LICENSES.md"

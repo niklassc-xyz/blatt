@@ -3,7 +3,7 @@ Description=Blatt local feed reader
 
 [Service]
 Type=simple
-ExecStart=blatt
+ExecStart=/usr/bin/blatt
 Environment=BLATT_ADDR=127.0.0.1:3000
 Restart=on-failure
 RestartSec=5s

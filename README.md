@@ -4,24 +4,6 @@ Blatt is a small local RSS and Atom reader built with Rust, Axum, Askama, HTMX, 
 
 ## Install
 
-A current stable Rust toolchain and `make` are required.
-
-### Local
-
-```sh
-make install
-systemctl --user daemon-reload
-systemctl --user enable --now blatt.service
-```
-
-### System-wide
-
-```sh
-sudo make PREFIX=/usr/local install
-systemctl --user daemon-reload
-systemctl --user enable --now blatt.service
-```
-
 ### AUR
 
 ```sh
