@@ -1,3 +1,5 @@
+# Maintainer: niklassc <me@niklassc.xyz>
+
 pkgname=blatt-git
 pkgver=0.1.0.r16.gc3ff889
 pkgrel=1
