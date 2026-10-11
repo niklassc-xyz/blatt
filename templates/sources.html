@@ -17,7 +17,7 @@
       <h2 id="add-feed-title">Add a source</h2>
       <p>RSS, Atom, and YouTube channel feeds are supported.</p>
     </div>
-    <form method="post" action="/sources" hx-post="/sources" hx-target="#feed-list" hx-swap="outerHTML">
+    <form id="add-feed-form" method="post" action="/sources" hx-post="/sources" hx-target="#feed-list" hx-swap="outerHTML">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>Feed URL<input id="new-feed-url" type="url" name="url" value="{{ new_feed.url }}" placeholder="https://example.com/feed.xml" autocomplete="off" required></label>
       <div class="form-field">
@@ -25,7 +25,7 @@
         {% include "feed_name_field.html" %}
       </div>
       <label>Tags<input type="text" name="tags" value="{{ new_feed.tags }}" placeholder="news, technology"></label>
-      <button type="submit">Add feed</button>
+      <button id="add-feed-button" type="submit">Add feed</button>
     </form>
   </section>
 

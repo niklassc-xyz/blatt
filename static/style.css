@@ -261,6 +261,36 @@ button:hover {
   border-left-color: var(--love);
 }
 
+.youtube-confirmation p {
+  margin-bottom: 0.75rem;
+}
+
+.youtube-confirmation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.youtube-confirmation-actions form {
+  margin: 0;
+}
+
+.youtube-confirmation-actions button {
+  min-height: 36px;
+}
+
+.secondary-button {
+  border: 1px solid var(--highlight-high);
+  color: var(--interactive-text);
+  background: transparent;
+}
+
+.secondary-button:hover,
+.secondary-button:focus-visible {
+  color: var(--base);
+  background: var(--pine);
+}
+
 .filter-bar {
   display: flex;
   align-items: center;

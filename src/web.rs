@@ -15,7 +15,7 @@ use tokio::{net::TcpListener, sync::Mutex};
 use tracing::{error, info};
 
 use crate::{
-    collector::{FeedCollector, RefreshReport},
+    collector::{FeedCollector, RefreshReport, is_youtube_channel_url},
     config::{
         AppPaths, ConfigError, ConfigStore, FeedConfig, config_path_display, tags_from_input,
     },
@@ -87,6 +87,8 @@ struct FeedForm {
     name: String,
     #[serde(default)]
     tags: String,
+    #[serde(default)]
+    youtube_action: String,
     csrf_token: String,
 }
 
@@ -97,6 +99,12 @@ struct FeedTitleForm {
     name: String,
     #[serde(default)]
     tags: String,
+    csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct YoutubeFeedForm {
+    url: String,
     csrf_token: String,
 }
 
@@ -213,6 +221,32 @@ struct NewFeedView {
     title_notice: Notice,
 }
 
+#[derive(Default)]
+struct YoutubeConfirmation {
+    show: bool,
+    url: String,
+    name: String,
+    tags: String,
+}
+
+impl YoutubeConfirmation {
+    fn for_feed(feed: &NewFeedView) -> Self {
+        Self {
+            show: true,
+            url: feed.url.clone(),
+            name: feed.name.clone(),
+            tags: feed.tags.clone(),
+        }
+    }
+}
+
+#[derive(Default)]
+struct SourceFormState {
+    new_feed: NewFeedView,
+    youtube_confirmation: YoutubeConfirmation,
+    clear_new_feed: bool,
+}
+
 #[derive(Template)]
 #[template(path = "index.html")]
 struct IndexTemplate {
@@ -287,6 +321,7 @@ struct SourcesTemplate {
     config_path: String,
     csrf_token: String,
     new_feed: NewFeedView,
+    youtube_confirmation: YoutubeConfirmation,
     posts_nav_active: bool,
     feeds_nav_active: bool,
     sources_nav_active: bool,
@@ -299,6 +334,7 @@ struct FeedListTemplate {
     notice: Notice,
     csrf_token: String,
     clear_new_feed: bool,
+    youtube_confirmation: YoutubeConfirmation,
 }
 
 #[derive(Template)]
@@ -330,6 +366,7 @@ pub async fn serve(address: SocketAddr, paths: AppPaths) -> Result<(), Box<dyn s
         .route("/feeds/list", get(feeds_fragment))
         .route("/sources", get(sources_page).post(add_feed))
         .route("/sources/title", post(fetch_feed_title))
+        .route("/sources/youtube-feed", post(resolve_youtube_feed))
         .route("/sources/update", post(update_feed))
         .route("/sources/delete", post(delete_feed))
         .route("/static/style.css", get(stylesheet))
@@ -478,7 +515,7 @@ async fn feeds_fragment(
 
 async fn sources_page(State(state): State<AppState>) -> Result<Response, AppError> {
     let list = build_feed_list(&state, Notice::default())?;
-    render_sources_page(&state, list, NewFeedView::default())
+    render_sources_page(&state, list, SourceFormState::default())
 }
 
 async fn add_feed(
@@ -487,14 +524,61 @@ async fn add_feed(
     Form(form): Form<FeedForm>,
 ) -> Result<Response, AppError> {
     verify_csrf(&state, &form.csrf_token)?;
+    let mut form_state = SourceFormState {
+        new_feed: NewFeedView {
+            url: form.url,
+            name: form.name,
+            tags: form.tags,
+            title_notice: Notice::default(),
+        },
+        ..SourceFormState::default()
+    };
+
+    if is_youtube_channel_url(&form_state.new_feed.url) {
+        match form.youtube_action.as_str() {
+            "resolve" => {
+                match state
+                    .collector
+                    .resolve_youtube_feed_url(&form_state.new_feed.url)
+                    .await
+                {
+                    Ok(feed_url) => form_state.new_feed.url = feed_url,
+                    Err(error) => {
+                        form_state.youtube_confirmation =
+                            YoutubeConfirmation::for_feed(&form_state.new_feed);
+                        return render_source_response(
+                            &state,
+                            &headers,
+                            Notice {
+                                text: format!("Could not find the YouTube feed: {error}"),
+                                is_error: true,
+                            },
+                            form_state,
+                        );
+                    }
+                }
+            }
+            "original" => {}
+            _ => {
+                form_state.youtube_confirmation =
+                    YoutubeConfirmation::for_feed(&form_state.new_feed);
+                return render_source_response(&state, &headers, Notice::default(), form_state);
+            }
+        }
+    }
+
     let result = state.config.add(FeedConfig {
-        url: form.url,
-        name: form.name,
-        tags: tags_from_input(&form.tags),
+        url: form_state.new_feed.url.clone(),
+        name: form_state.new_feed.name.clone(),
+        tags: tags_from_input(&form_state.new_feed.tags),
     });
     let feed_added = result.is_ok();
+    form_state.clear_new_feed = feed_added;
+    if feed_added {
+        form_state.new_feed = NewFeedView::default();
+    }
     let notice = operation_notice(result, "Feed added. Use refresh to retrieve its articles.");
-    render_source_response(&state, &headers, notice, feed_added)
+    render_source_response(&state, &headers, notice, form_state)
 }
 
 async fn fetch_feed_title(
@@ -530,7 +614,35 @@ async fn fetch_feed_title(
         render_template(FeedNameFieldTemplate { new_feed })
     } else {
         let list = build_feed_list(&state, Notice::default())?;
-        render_sources_page(&state, list, new_feed)
+        render_sources_page(
+            &state,
+            list,
+            SourceFormState {
+                new_feed,
+                ..SourceFormState::default()
+            },
+        )
+    }
+}
+
+async fn resolve_youtube_feed(
+    State(state): State<AppState>,
+    Form(form): Form<YoutubeFeedForm>,
+) -> Result<Response, AppError> {
+    verify_csrf(&state, &form.csrf_token)?;
+    match state.collector.resolve_youtube_feed_url(&form.url).await {
+        Ok(feed_url) => {
+            let mut response = feed_url.into_response();
+            response
+                .headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            Ok(response)
+        }
+        Err(error) => Ok((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("Could not find the YouTube feed: {error}"),
+        )
+            .into_response()),
     }
 }
 
@@ -575,7 +687,7 @@ async fn update_feed(
             )
         }
     };
-    render_source_response(&state, &headers, notice, false)
+    render_source_response(&state, &headers, notice, SourceFormState::default())
 }
 
 async fn delete_feed(
@@ -597,14 +709,14 @@ async fn delete_feed(
             "Feed deleted, but its hidden cache rows could not be removed.",
         ),
     };
-    render_source_response(&state, &headers, notice, false)
+    render_source_response(&state, &headers, notice, SourceFormState::default())
 }
 
 fn render_source_response(
     state: &AppState,
     headers: &HeaderMap,
     notice: Notice,
-    clear_new_feed: bool,
+    form_state: SourceFormState,
 ) -> Result<Response, AppError> {
     let list = build_feed_list(state, notice)?;
     if is_htmx(headers) {
@@ -612,24 +724,26 @@ fn render_source_response(
             feeds: list.feeds,
             notice: list.notice,
             csrf_token: state.csrf_token.clone(),
-            clear_new_feed,
+            clear_new_feed: form_state.clear_new_feed,
+            youtube_confirmation: form_state.youtube_confirmation,
         })
     } else {
-        render_sources_page(state, list, NewFeedView::default())
+        render_sources_page(state, list, form_state)
     }
 }
 
 fn render_sources_page(
     state: &AppState,
     list: FeedList,
-    new_feed: NewFeedView,
+    form_state: SourceFormState,
 ) -> Result<Response, AppError> {
     render_template(SourcesTemplate {
         feeds: list.feeds,
         notice: list.notice,
         config_path: state.config_path.clone(),
         csrf_token: state.csrf_token.clone(),
-        new_feed,
+        new_feed: form_state.new_feed,
+        youtube_confirmation: form_state.youtube_confirmation,
         posts_nav_active: false,
         feeds_nav_active: false,
         sources_nav_active: true,

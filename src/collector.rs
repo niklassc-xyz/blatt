@@ -12,6 +12,11 @@ use crate::{
 
 const MAX_FEED_BYTES: usize = 10 * 1024 * 1024;
 const MAX_CONCURRENT_FETCHES: usize = 8;
+const YOUTUBE_FEED_URL: &str = "https://www.youtube.com/feeds/videos.xml";
+
+pub fn is_youtube_channel_url(value: &str) -> bool {
+    parse_youtube_channel_url(value).is_some()
+}
 
 #[derive(Clone)]
 pub struct FeedCollector {
@@ -82,6 +87,18 @@ impl FeedCollector {
         parse_title(&bytes, &base_url)
     }
 
+    pub async fn resolve_youtube_feed_url(&self, url: &str) -> Result<String, String> {
+        let channel_url = parse_youtube_channel_url(url)
+            .ok_or_else(|| "URL is not a recognized YouTube channel page".to_owned())?;
+        if let Some(channel_id) = youtube_channel_id(&channel_url) {
+            return Ok(youtube_feed_url(&channel_id));
+        }
+
+        let (bytes, _) = self.download(channel_url.as_str()).await?;
+        youtube_feed_url_from_page(&bytes)
+            .ok_or_else(|| "YouTube did not advertise a feed for that channel page".to_owned())
+    }
+
     async fn fetch(&self, feed: &FeedConfig) -> Result<Vec<Article>, String> {
         let (bytes, base_url) = self.download(&feed.url).await?;
         parse_articles(feed, &bytes, &base_url)
@@ -118,6 +135,57 @@ impl FeedCollector {
 
         Ok((bytes, base_url))
     }
+}
+
+fn parse_youtube_channel_url(value: &str) -> Option<Url> {
+    let url = Url::parse(value.trim()).ok()?;
+    if !matches!(url.scheme(), "http" | "https") {
+        return None;
+    }
+    let host = url.host_str()?;
+    if host != "youtube.com" && !host.ends_with(".youtube.com") {
+        return None;
+    }
+
+    let mut segments = url.path_segments()?;
+    let first = segments.next()?;
+    let second = segments.next();
+    let is_channel = (first.starts_with('@') && first.len() > 1)
+        || (matches!(first, "channel" | "c" | "user")
+            && second.is_some_and(|value| !value.is_empty()));
+    is_channel.then_some(url)
+}
+
+fn youtube_channel_id(url: &Url) -> Option<String> {
+    let mut segments = url.path_segments()?;
+    (segments.next()? == "channel")
+        .then(|| segments.next().map(str::to_owned))
+        .flatten()
+}
+
+fn youtube_feed_url(channel_id: &str) -> String {
+    let mut url = Url::parse(YOUTUBE_FEED_URL).expect("YouTube feed URL must be valid");
+    url.query_pairs_mut().append_pair("channel_id", channel_id);
+    url.to_string()
+}
+
+fn youtube_feed_url_from_page(bytes: &[u8]) -> Option<String> {
+    let page = String::from_utf8_lossy(bytes);
+    [
+        "youtube.com/feeds/videos.xml?channel_id=",
+        r"youtube.com\/feeds\/videos.xml?channel_id=",
+    ]
+    .into_iter()
+    .find_map(|marker| {
+        let remainder = page.split_once(marker)?.1;
+        let channel_id = remainder
+            .chars()
+            .take_while(|character| {
+                character.is_ascii_alphanumeric() || matches!(character, '-' | '_')
+            })
+            .collect::<String>();
+        (!channel_id.is_empty()).then(|| youtube_feed_url(&channel_id))
+    })
 }
 
 fn parse_feed(bytes: &[u8], base_url: &Url) -> Result<Feed, String> {
@@ -291,6 +359,38 @@ mod tests {
         let base_url = Url::parse("https://example.com/feed.xml").unwrap();
 
         assert_eq!(parse_title(xml, &base_url).unwrap(), "Example News");
+    }
+
+    #[test]
+    fn recognizes_youtube_channel_pages_but_not_video_or_feed_urls() {
+        assert!(is_youtube_channel_url(
+            "https://www.youtube.com/@example/videos"
+        ));
+        assert!(is_youtube_channel_url("https://youtube.com/channel/UC123"));
+        assert!(is_youtube_channel_url("https://m.youtube.com/user/example"));
+        assert!(!is_youtube_channel_url(
+            "https://www.youtube.com/watch?v=example"
+        ));
+        assert!(!is_youtube_channel_url(
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UC123"
+        ));
+        assert!(!is_youtube_channel_url("https://notyoutube.com/@example"));
+    }
+
+    #[test]
+    fn converts_channel_ids_and_discovers_feed_urls_in_channel_pages() {
+        let channel_url = Url::parse("https://www.youtube.com/channel/UC123/videos").unwrap();
+        assert_eq!(
+            youtube_feed_url(&youtube_channel_id(&channel_url).unwrap()),
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UC123"
+        );
+
+        let page = br#"<link rel="alternate" type="application/rss+xml"
+            href="https://www.youtube.com/feeds/videos.xml?channel_id=UC456">"#;
+        assert_eq!(
+            youtube_feed_url_from_page(page).as_deref(),
+            Some("https://www.youtube.com/feeds/videos.xml?channel_id=UC456")
+        );
     }
 
     #[test]

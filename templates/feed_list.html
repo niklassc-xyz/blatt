@@ -7,6 +7,30 @@
   <p class="notice{% if notice.is_error %} notice-error{% endif %}" role="status">{{ notice.text }}</p>
   {% endif %}
 
+  {% if youtube_confirmation.show %}
+  <div class="notice youtube-confirmation" role="alert">
+    <p><strong>YouTube channel page detected.</strong> Should Blatt try to find and use its feed URL before adding it?</p>
+    <div class="youtube-confirmation-actions">
+      <form method="post" action="/sources" hx-post="/sources" hx-target="#feed-list" hx-swap="outerHTML">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="url" value="{{ youtube_confirmation.url }}">
+        <input type="hidden" name="name" value="{{ youtube_confirmation.name }}">
+        <input type="hidden" name="tags" value="{{ youtube_confirmation.tags }}">
+        <input type="hidden" name="youtube_action" value="resolve">
+        <button class="small-button" type="submit">Find feed and add</button>
+      </form>
+      <form method="post" action="/sources" hx-post="/sources" hx-target="#feed-list" hx-swap="outerHTML">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="url" value="{{ youtube_confirmation.url }}">
+        <input type="hidden" name="name" value="{{ youtube_confirmation.name }}">
+        <input type="hidden" name="tags" value="{{ youtube_confirmation.tags }}">
+        <input type="hidden" name="youtube_action" value="original">
+        <button class="small-button secondary-button" type="submit">Add original URL</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
   {% for feed in feeds %}
   <article class="feed-card">
     <form class="feed-fields" method="post" action="/sources/update" hx-post="/sources/update" hx-target="#feed-list" hx-swap="outerHTML">
