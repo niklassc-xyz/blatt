@@ -1004,8 +1004,33 @@ async fn navigation_script() -> impl IntoResponse {
 }
 
 async fn shutdown_signal() {
+    #[cfg(unix)]
+    {
+        let mut terminate =
+            match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+                Ok(signal) => signal,
+                Err(error) => {
+                    error!(%error, "could not install SIGTERM handler");
+                    if let Err(error) = tokio::signal::ctrl_c().await {
+                        error!(%error, "could not install Ctrl+C handler");
+                    }
+                    return;
+                }
+            };
+
+        tokio::select! {
+            result = tokio::signal::ctrl_c() => {
+                if let Err(error) = result {
+                    error!(%error, "could not install Ctrl+C handler");
+                }
+            }
+            _ = terminate.recv() => {}
+        }
+    }
+
+    #[cfg(not(unix))]
     if let Err(error) = tokio::signal::ctrl_c().await {
-        error!(%error, "could not install shutdown signal handler");
+        error!(%error, "could not install Ctrl+C handler");
     }
 }
 

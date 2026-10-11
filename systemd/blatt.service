@@ -1,0 +1,25 @@
+[Unit]
+Description=Blatt local feed reader
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/blatt
+Environment=BLATT_ADDR=127.0.0.1:3000
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectControlGroups=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=default.target
