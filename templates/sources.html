@@ -19,7 +19,7 @@
     </div>
     <form method="post" action="/sources" hx-post="/sources" hx-target="#feed-list" hx-swap="outerHTML">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label>Feed URL<input id="new-feed-url" type="url" name="url" value="{{ new_feed.url }}" placeholder="https://example.com/feed.xml" required></label>
+      <label>Feed URL<input id="new-feed-url" type="url" name="url" value="{{ new_feed.url }}" placeholder="https://example.com/feed.xml" autocomplete="off" required></label>
       <div class="form-field">
         <label for="new-feed-name">Name</label>
         {% include "feed_name_field.html" %}

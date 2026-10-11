@@ -1,6 +1,6 @@
 {% include "feed_list.html" %}
 {% if clear_new_feed %}
-<input id="new-feed-url" type="url" name="url" placeholder="https://example.com/feed.xml" required hx-swap-oob="outerHTML">
-<input id="new-feed-name" type="text" name="name" placeholder="Example News" required hx-swap-oob="outerHTML">
+<input id="new-feed-url" type="url" name="url" placeholder="https://example.com/feed.xml" autocomplete="off" required hx-swap-oob="outerHTML">
+<input id="new-feed-name" type="text" name="name" placeholder="Example News" autocomplete="off" required hx-swap-oob="outerHTML">
 <span hx-swap-oob="delete:#feed-title-notice"></span>
 {% endif %}
