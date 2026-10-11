@@ -293,11 +293,12 @@ struct SourcesTemplate {
 }
 
 #[derive(Template)]
-#[template(path = "feed_list.html")]
+#[template(path = "feed_list_response.html")]
 struct FeedListTemplate {
     feeds: Vec<FeedView>,
     notice: Notice,
     csrf_token: String,
+    clear_new_feed: bool,
 }
 
 #[derive(Template)]
@@ -491,8 +492,9 @@ async fn add_feed(
         name: form.name,
         tags: tags_from_input(&form.tags),
     });
+    let feed_added = result.is_ok();
     let notice = operation_notice(result, "Feed added. Use refresh to retrieve its articles.");
-    render_source_response(&state, &headers, notice)
+    render_source_response(&state, &headers, notice, feed_added)
 }
 
 async fn fetch_feed_title(
@@ -573,7 +575,7 @@ async fn update_feed(
             )
         }
     };
-    render_source_response(&state, &headers, notice)
+    render_source_response(&state, &headers, notice, false)
 }
 
 async fn delete_feed(
@@ -595,13 +597,14 @@ async fn delete_feed(
             "Feed deleted, but its hidden cache rows could not be removed.",
         ),
     };
-    render_source_response(&state, &headers, notice)
+    render_source_response(&state, &headers, notice, false)
 }
 
 fn render_source_response(
     state: &AppState,
     headers: &HeaderMap,
     notice: Notice,
+    clear_new_feed: bool,
 ) -> Result<Response, AppError> {
     let list = build_feed_list(state, notice)?;
     if is_htmx(headers) {
@@ -609,6 +612,7 @@ fn render_source_response(
             feeds: list.feeds,
             notice: list.notice,
             csrf_token: state.csrf_token.clone(),
+            clear_new_feed,
         })
     } else {
         render_sources_page(state, list, NewFeedView::default())
