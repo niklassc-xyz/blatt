@@ -2,21 +2,35 @@
 
 Blatt is a small local RSS and Atom reader built with Rust, Axum, Askama, HTMX, and SQLite. It displays Media RSS, image enclosure, and YouTube thumbnails when feeds provide them, tracks read articles, and supports feed, tag, and read-status filtering. The interface follows the system light or dark preference using Rosé Pine Dawn and Rosé Pine. It fetches feeds only when you press **Refresh feeds**, then serves the cached articles without contacting external feed servers during normal browsing or filtering.
 
-## Run
+## Install
 
-Install a current stable Rust toolchain, then run:
+A current stable Rust toolchain and `make` are required.
 
-```sh
-cargo run --release
-```
-
-Open <http://127.0.0.1:3000>. Stop the server with `Ctrl+C`.
-
-The application binds only to localhost by default. Set `BLATT_ADDR` to use another address:
+### Local
 
 ```sh
-BLATT_ADDR=127.0.0.1:8080 cargo run --release
+make install
+systemctl --user daemon-reload
+systemctl --user enable --now blatt.service
 ```
+
+### System-wide
+
+```sh
+sudo make PREFIX=/usr/local install
+systemctl --user daemon-reload
+systemctl --user enable --now blatt.service
+```
+
+### AUR
+
+```sh
+cd packaging/aur
+makepkg -si
+systemctl --user enable --now blatt.service
+```
+
+Open <http://127.0.0.1:3000> after installation.
 
 ## Configuration
 
