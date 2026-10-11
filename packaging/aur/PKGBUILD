@@ -1,7 +1,7 @@
 # Maintainer: niklassc <me@niklassc.xyz>
 
 pkgname=blatt-git
-pkgver=0.1.0.r16.gc3ff889
+pkgver=0.1.0.r19.g54e6729
 pkgrel=1
 pkgdesc="Lightweight local RSS and Atom reader"
 arch=('x86_64' 'aarch64')
@@ -13,6 +13,7 @@ provides=('blatt')
 conflicts=('blatt')
 source=('blatt::git+https://github.com/niklassc-xyz/blatt.git')
 b2sums=('SKIP')
+options=('!lto')
 
 pkgver() {
     cd "$srcdir/blatt"
