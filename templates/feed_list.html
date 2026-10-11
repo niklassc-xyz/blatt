@@ -1,6 +1,6 @@
 <section id="feed-list" class="feed-list" aria-labelledby="feed-list-title">
   <div class="section-heading">
-    <h2 id="feed-list-title">Current sources</h2>
+    <h2 id="feed-list-title">Your feeds</h2>
   </div>
 
   {% if !notice.text.is_empty() %}
@@ -11,19 +11,21 @@
   <div class="notice youtube-confirmation" role="alert">
     <p><strong>YouTube channel page detected.</strong> Should Blatt try to find and use its feed URL before adding it?</p>
     <div class="youtube-confirmation-actions">
-      <form method="post" action="/sources" hx-post="/sources" hx-target="#feed-list" hx-swap="outerHTML">
+      <form method="post" action="/feeds" hx-post="/feeds" hx-target="#feed-list" hx-swap="outerHTML">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="url" value="{{ youtube_confirmation.url }}">
         <input type="hidden" name="name" value="{{ youtube_confirmation.name }}">
         <input type="hidden" name="tags" value="{{ youtube_confirmation.tags }}">
+        <input type="hidden" name="tag" value="{{ selected_tag }}">
         <input type="hidden" name="youtube_action" value="resolve">
         <button class="small-button" type="submit">Find feed and add</button>
       </form>
-      <form method="post" action="/sources" hx-post="/sources" hx-target="#feed-list" hx-swap="outerHTML">
+      <form method="post" action="/feeds" hx-post="/feeds" hx-target="#feed-list" hx-swap="outerHTML">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="url" value="{{ youtube_confirmation.url }}">
         <input type="hidden" name="name" value="{{ youtube_confirmation.name }}">
         <input type="hidden" name="tags" value="{{ youtube_confirmation.tags }}">
+        <input type="hidden" name="tag" value="{{ selected_tag }}">
         <input type="hidden" name="youtube_action" value="original">
         <button class="small-button secondary-button" type="submit">Add original URL</button>
       </form>
@@ -31,26 +33,57 @@
   </div>
   {% endif %}
 
-  {% for feed in feeds %}
-  <article class="feed-card">
-    <form class="feed-fields" method="post" action="/sources/update" hx-post="/sources/update" hx-target="#feed-list" hx-swap="outerHTML">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <input type="hidden" name="original_url" value="{{ feed.url }}">
-      <label>Name<input type="text" name="name" value="{{ feed.name }}" required></label>
-      <label>Feed URL<input type="url" name="url" value="{{ feed.url }}" required></label>
-      <label>Tags<input type="text" name="tags" value="{{ feed.tags }}" placeholder="Comma-separated"></label>
-      <button class="small-button" type="submit">Save changes</button>
-    </form>
-    <form method="post" action="/sources/delete" hx-post="/sources/delete" hx-target="#feed-list" hx-swap="outerHTML" hx-confirm="Delete {{ feed.name }}?">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <input type="hidden" name="url" value="{{ feed.url }}">
-      <button class="danger-button" type="submit">Delete</button>
-    </form>
-  </article>
-  {% else %}
-  <div class="empty-state compact">
-    <h3>No feeds configured.</h3>
-    <p>Add your first source above or edit the TOML configuration file directly.</p>
+  <div class="filter-bar feeds-filter-bar">
+    <nav class="tag-strip" aria-label="Filter feeds by tag">
+      <a class="tag{% if all_active %} active{% endif %}"{% if all_active %} aria-current="true"{% endif %} href="{{ all_tags_href }}" hx-get="{{ all_tags_fragment_href }}" hx-target="#feed-list" hx-swap="outerHTML" hx-push-url="{{ all_tags_href }}">All tags</a>
+      {% for tag in tags %}
+      <a class="tag{% if tag.active %} active{% endif %}"{% if tag.active %} aria-current="true"{% endif %} href="{{ tag.href }}" hx-get="{{ tag.fragment_href }}" hx-target="#feed-list" hx-swap="outerHTML" hx-push-url="{{ tag.href }}">{{ tag.name }}</a>
+      {% endfor %}
+    </nav>
   </div>
-  {% endfor %}
+
+  <div class="feed-management-list">
+    {% for feed in feeds %}
+    <article class="feed-card">
+      <div class="feed-card-header">
+        <div class="feed-card-summary">
+          <h3>{{ feed.name }}</h3>
+          <div class="feed-tags" aria-label="Tags">
+            {% for tag in feed.tags %}
+            <span>{{ tag }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        <a class="feed-view-link" href="{{ feed.posts_href }}">View posts</a>
+      </div>
+      <div class="feed-card-controls">
+        <form class="feed-fields" method="post" action="/feeds/update" hx-post="/feeds/update" hx-target="#feed-list" hx-swap="outerHTML">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="original_url" value="{{ feed.url }}">
+          <input type="hidden" name="tag" value="{{ selected_tag }}">
+          <label>Name<input type="text" name="name" value="{{ feed.name }}" required></label>
+          <label>Feed URL<input type="url" name="url" value="{{ feed.url }}" required></label>
+          <label>Tags<input type="text" name="tags" value="{{ feed.tags_input }}" placeholder="Comma-separated"></label>
+          <button class="small-button" type="submit">Save changes</button>
+        </form>
+        <form method="post" action="/feeds/delete" hx-post="/feeds/delete" hx-target="#feed-list" hx-swap="outerHTML" hx-confirm="Delete {{ feed.name }}?">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="url" value="{{ feed.url }}">
+          <input type="hidden" name="tag" value="{{ selected_tag }}">
+          <button class="danger-button" type="submit">Delete</button>
+        </form>
+      </div>
+    </article>
+    {% else %}
+    <div class="empty-state compact">
+      {% if selected_tag.is_empty() %}
+      <h3>No feeds configured.</h3>
+      <p>Add your first feed above or edit the TOML configuration file directly.</p>
+      {% else %}
+      <h3>No feeds with this tag.</h3>
+      <p>Choose another tag or show all feeds.</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
 </section>

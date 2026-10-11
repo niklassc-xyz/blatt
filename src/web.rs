@@ -89,6 +89,8 @@ struct FeedForm {
     tags: String,
     #[serde(default)]
     youtube_action: String,
+    #[serde(default)]
+    tag: String,
     csrf_token: String,
 }
 
@@ -99,6 +101,8 @@ struct FeedTitleForm {
     name: String,
     #[serde(default)]
     tags: String,
+    #[serde(default)]
+    tag: String,
     csrf_token: String,
 }
 
@@ -115,12 +119,16 @@ struct UpdateFeedForm {
     name: String,
     #[serde(default)]
     tags: String,
+    #[serde(default)]
+    tag: String,
     csrf_token: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct DeleteFeedForm {
     url: String,
+    #[serde(default)]
+    tag: String,
     csrf_token: String,
 }
 
@@ -162,18 +170,12 @@ struct ArticleFilters {
 }
 
 #[derive(Clone)]
-struct FeedDirectoryView {
-    name: String,
-    url: String,
-    tags: Vec<String>,
-    posts_href: String,
-}
-
-#[derive(Clone)]
 struct FeedView {
     url: String,
     name: String,
-    tags: String,
+    tags: Vec<String>,
+    tags_input: String,
+    posts_href: String,
 }
 
 #[derive(Default)]
@@ -199,17 +201,13 @@ struct ArticlesPanel {
     notice: Notice,
 }
 
-struct FeedsPanel {
-    feeds: Vec<FeedDirectoryView>,
+struct FeedList {
+    feeds: Vec<FeedView>,
     tags: Vec<TagView>,
     selected_tag: String,
     all_active: bool,
     all_tags_href: String,
     all_tags_fragment_href: String,
-}
-
-struct FeedList {
-    feeds: Vec<FeedView>,
     notice: Notice,
 }
 
@@ -241,10 +239,11 @@ impl YoutubeConfirmation {
 }
 
 #[derive(Default)]
-struct SourceFormState {
+struct FeedFormState {
     new_feed: NewFeedView,
     youtube_confirmation: YoutubeConfirmation,
     clear_new_feed: bool,
+    selected_tag: String,
 }
 
 #[derive(Template)]
@@ -266,7 +265,6 @@ struct IndexTemplate {
     notice: Notice,
     posts_nav_active: bool,
     feeds_nav_active: bool,
-    sources_nav_active: bool,
 }
 
 #[derive(Template)]
@@ -291,32 +289,12 @@ struct ArticlesPanelTemplate {
 #[derive(Template)]
 #[template(path = "feeds.html")]
 struct FeedsTemplate {
-    feeds: Vec<FeedDirectoryView>,
-    tags: Vec<TagView>,
-    selected_tag: String,
-    all_active: bool,
-    all_tags_href: String,
-    all_tags_fragment_href: String,
-    posts_nav_active: bool,
-    feeds_nav_active: bool,
-    sources_nav_active: bool,
-}
-
-#[derive(Template)]
-#[template(path = "feeds_panel.html")]
-struct FeedsPanelTemplate {
-    feeds: Vec<FeedDirectoryView>,
-    tags: Vec<TagView>,
-    selected_tag: String,
-    all_active: bool,
-    all_tags_href: String,
-    all_tags_fragment_href: String,
-}
-
-#[derive(Template)]
-#[template(path = "sources.html")]
-struct SourcesTemplate {
     feeds: Vec<FeedView>,
+    tags: Vec<TagView>,
+    selected_tag: String,
+    all_active: bool,
+    all_tags_href: String,
+    all_tags_fragment_href: String,
     notice: Notice,
     config_path: String,
     csrf_token: String,
@@ -324,13 +302,17 @@ struct SourcesTemplate {
     youtube_confirmation: YoutubeConfirmation,
     posts_nav_active: bool,
     feeds_nav_active: bool,
-    sources_nav_active: bool,
 }
 
 #[derive(Template)]
 #[template(path = "feed_list_response.html")]
 struct FeedListTemplate {
     feeds: Vec<FeedView>,
+    tags: Vec<TagView>,
+    selected_tag: String,
+    all_active: bool,
+    all_tags_href: String,
+    all_tags_fragment_href: String,
     notice: Notice,
     csrf_token: String,
     clear_new_feed: bool,
@@ -362,13 +344,13 @@ pub async fn serve(address: SocketAddr, paths: AppPaths) -> Result<(), Box<dyn s
         .route("/articles/open", get(open_article))
         .route("/articles/read", post(set_article_read))
         .route("/refresh", post(refresh))
-        .route("/feeds", get(feeds_page))
+        .route("/feeds", get(feeds_page).post(add_feed))
         .route("/feeds/list", get(feeds_fragment))
-        .route("/sources", get(sources_page).post(add_feed))
-        .route("/sources/title", post(fetch_feed_title))
-        .route("/sources/youtube-feed", post(resolve_youtube_feed))
-        .route("/sources/update", post(update_feed))
-        .route("/sources/delete", post(delete_feed))
+        .route("/feeds/title", post(fetch_feed_title))
+        .route("/feeds/youtube-feed", post(resolve_youtube_feed))
+        .route("/feeds/update", post(update_feed))
+        .route("/feeds/delete", post(delete_feed))
+        .route("/sources", get(sources_redirect))
         .route("/static/style.css", get(stylesheet))
         .route("/static/htmx.min.js", get(htmx))
         .route("/static/navigation.js", get(navigation_script))
@@ -492,30 +474,25 @@ async fn feeds_page(
     State(state): State<AppState>,
     Query(query): Query<FeedQuery>,
 ) -> Result<Response, AppError> {
-    let panel = build_feeds_panel(&state, query.tag)?;
-    render_template(FeedsTemplate {
-        feeds: panel.feeds,
-        tags: panel.tags,
-        selected_tag: panel.selected_tag,
-        all_active: panel.all_active,
-        all_tags_href: panel.all_tags_href,
-        all_tags_fragment_href: panel.all_tags_fragment_href,
-        posts_nav_active: false,
-        feeds_nav_active: true,
-        sources_nav_active: false,
-    })
+    let form_state = FeedFormState {
+        selected_tag: query.tag.unwrap_or_default(),
+        ..FeedFormState::default()
+    };
+    let list = build_feed_list(&state, &form_state.selected_tag, Notice::default())?;
+    render_feeds_page(&state, list, form_state)
 }
 
 async fn feeds_fragment(
     State(state): State<AppState>,
     Query(query): Query<FeedQuery>,
 ) -> Result<Response, AppError> {
-    render_feeds_panel(build_feeds_panel(&state, query.tag)?)
+    let selected_tag = query.tag.unwrap_or_default();
+    let list = build_feed_list(&state, &selected_tag, Notice::default())?;
+    render_feed_list(&state, list, false, YoutubeConfirmation::default())
 }
 
-async fn sources_page(State(state): State<AppState>) -> Result<Response, AppError> {
-    let list = build_feed_list(&state, Notice::default())?;
-    render_sources_page(&state, list, SourceFormState::default())
+async fn sources_redirect() -> Redirect {
+    Redirect::permanent("/feeds")
 }
 
 async fn add_feed(
@@ -524,14 +501,15 @@ async fn add_feed(
     Form(form): Form<FeedForm>,
 ) -> Result<Response, AppError> {
     verify_csrf(&state, &form.csrf_token)?;
-    let mut form_state = SourceFormState {
+    let mut form_state = FeedFormState {
         new_feed: NewFeedView {
             url: form.url,
             name: form.name,
             tags: form.tags,
             title_notice: Notice::default(),
         },
-        ..SourceFormState::default()
+        selected_tag: form.tag,
+        ..FeedFormState::default()
     };
 
     if is_youtube_channel_url(&form_state.new_feed.url) {
@@ -546,7 +524,7 @@ async fn add_feed(
                     Err(error) => {
                         form_state.youtube_confirmation =
                             YoutubeConfirmation::for_feed(&form_state.new_feed);
-                        return render_source_response(
+                        return render_feed_response(
                             &state,
                             &headers,
                             Notice {
@@ -562,7 +540,7 @@ async fn add_feed(
             _ => {
                 form_state.youtube_confirmation =
                     YoutubeConfirmation::for_feed(&form_state.new_feed);
-                return render_source_response(&state, &headers, Notice::default(), form_state);
+                return render_feed_response(&state, &headers, Notice::default(), form_state);
             }
         }
     }
@@ -578,7 +556,7 @@ async fn add_feed(
         form_state.new_feed = NewFeedView::default();
     }
     let notice = operation_notice(result, "Feed added. Use refresh to retrieve its articles.");
-    render_source_response(&state, &headers, notice, form_state)
+    render_feed_response(&state, &headers, notice, form_state)
 }
 
 async fn fetch_feed_title(
@@ -613,13 +591,14 @@ async fn fetch_feed_title(
     if is_htmx(&headers) {
         render_template(FeedNameFieldTemplate { new_feed })
     } else {
-        let list = build_feed_list(&state, Notice::default())?;
-        render_sources_page(
+        let list = build_feed_list(&state, &form.tag, Notice::default())?;
+        render_feeds_page(
             &state,
             list,
-            SourceFormState {
+            FeedFormState {
                 new_feed,
-                ..SourceFormState::default()
+                selected_tag: form.tag,
+                ..FeedFormState::default()
             },
         )
     }
@@ -687,7 +666,15 @@ async fn update_feed(
             )
         }
     };
-    render_source_response(&state, &headers, notice, SourceFormState::default())
+    render_feed_response(
+        &state,
+        &headers,
+        notice,
+        FeedFormState {
+            selected_tag: form.tag,
+            ..FeedFormState::default()
+        },
+    )
 }
 
 async fn delete_feed(
@@ -709,44 +696,75 @@ async fn delete_feed(
             "Feed deleted, but its hidden cache rows could not be removed.",
         ),
     };
-    render_source_response(&state, &headers, notice, SourceFormState::default())
+    render_feed_response(
+        &state,
+        &headers,
+        notice,
+        FeedFormState {
+            selected_tag: form.tag,
+            ..FeedFormState::default()
+        },
+    )
 }
 
-fn render_source_response(
+fn render_feed_response(
     state: &AppState,
     headers: &HeaderMap,
     notice: Notice,
-    form_state: SourceFormState,
+    form_state: FeedFormState,
 ) -> Result<Response, AppError> {
-    let list = build_feed_list(state, notice)?;
+    let list = build_feed_list(state, &form_state.selected_tag, notice)?;
     if is_htmx(headers) {
-        render_template(FeedListTemplate {
-            feeds: list.feeds,
-            notice: list.notice,
-            csrf_token: state.csrf_token.clone(),
-            clear_new_feed: form_state.clear_new_feed,
-            youtube_confirmation: form_state.youtube_confirmation,
-        })
+        render_feed_list(
+            state,
+            list,
+            form_state.clear_new_feed,
+            form_state.youtube_confirmation,
+        )
     } else {
-        render_sources_page(state, list, form_state)
+        render_feeds_page(state, list, form_state)
     }
 }
 
-fn render_sources_page(
+fn render_feeds_page(
     state: &AppState,
     list: FeedList,
-    form_state: SourceFormState,
+    form_state: FeedFormState,
 ) -> Result<Response, AppError> {
-    render_template(SourcesTemplate {
+    render_template(FeedsTemplate {
         feeds: list.feeds,
+        tags: list.tags,
+        selected_tag: list.selected_tag,
+        all_active: list.all_active,
+        all_tags_href: list.all_tags_href,
+        all_tags_fragment_href: list.all_tags_fragment_href,
         notice: list.notice,
         config_path: state.config_path.clone(),
         csrf_token: state.csrf_token.clone(),
         new_feed: form_state.new_feed,
         youtube_confirmation: form_state.youtube_confirmation,
         posts_nav_active: false,
-        feeds_nav_active: false,
-        sources_nav_active: true,
+        feeds_nav_active: true,
+    })
+}
+
+fn render_feed_list(
+    state: &AppState,
+    list: FeedList,
+    clear_new_feed: bool,
+    youtube_confirmation: YoutubeConfirmation,
+) -> Result<Response, AppError> {
+    render_template(FeedListTemplate {
+        feeds: list.feeds,
+        tags: list.tags,
+        selected_tag: list.selected_tag,
+        all_active: list.all_active,
+        all_tags_href: list.all_tags_href,
+        all_tags_fragment_href: list.all_tags_fragment_href,
+        notice: list.notice,
+        csrf_token: state.csrf_token.clone(),
+        clear_new_feed,
+        youtube_confirmation,
     })
 }
 
@@ -935,37 +953,28 @@ fn read_filter_status(read_filter: ReadFilter) -> &'static str {
     }
 }
 
-fn build_feed_list(state: &AppState, notice: Notice) -> Result<FeedList, AppError> {
-    let mut feeds = state
-        .config
-        .feeds()?
-        .into_iter()
-        .map(|feed| FeedView {
-            url: feed.url,
-            name: feed.name,
-            tags: feed.tags.join(", "),
-        })
-        .collect::<Vec<_>>();
-    feeds.sort_by_key(|feed| feed.name.to_lowercase());
-    Ok(FeedList { feeds, notice })
-}
-
-fn build_feeds_panel(
+fn build_feed_list(
     state: &AppState,
-    selected_tag: Option<String>,
-) -> Result<FeedsPanel, AppError> {
-    Ok(feed_directory(
+    selected_tag: &str,
+    notice: Notice,
+) -> Result<FeedList, AppError> {
+    Ok(feed_list(
         state.config.feeds()?,
-        selected_tag.unwrap_or_default(),
+        selected_tag.to_owned(),
+        notice,
     ))
 }
 
-fn feed_directory(mut feeds: Vec<FeedConfig>, selected_tag: String) -> FeedsPanel {
+fn feed_list(mut feeds: Vec<FeedConfig>, selected_tag: String, notice: Notice) -> FeedList {
     let all_active = selected_tag.is_empty();
-    let tags = feeds
+    let mut tag_names = feeds
         .iter()
         .flat_map(|feed| feed.tags.iter().cloned())
-        .collect::<BTreeSet<_>>()
+        .collect::<BTreeSet<_>>();
+    if !selected_tag.is_empty() {
+        tag_names.insert(selected_tag.clone());
+    }
+    let tags = tag_names
         .into_iter()
         .map(|name| TagView {
             href: feeds_url("/feeds", &name),
@@ -979,6 +988,7 @@ fn feed_directory(mut feeds: Vec<FeedConfig>, selected_tag: String) -> FeedsPane
         .into_iter()
         .filter(|feed| selected_tag.is_empty() || feed.tags.contains(&selected_tag))
         .map(|feed| {
+            let tags_input = feed.tags.join(", ");
             let posts_href = articles_url(
                 "/",
                 &ArticleFilters {
@@ -986,21 +996,23 @@ fn feed_directory(mut feeds: Vec<FeedConfig>, selected_tag: String) -> FeedsPane
                     ..ArticleFilters::default()
                 },
             );
-            FeedDirectoryView {
+            FeedView {
                 name: feed.name,
                 url: feed.url,
                 tags: feed.tags,
+                tags_input,
                 posts_href,
             }
         })
         .collect();
-    FeedsPanel {
+    FeedList {
         feeds,
         tags,
         selected_tag,
         all_active,
         all_tags_href: "/feeds".to_owned(),
         all_tags_fragment_href: "/feeds/list".to_owned(),
+        notice,
     }
 }
 
@@ -1110,18 +1122,6 @@ fn render_index(panel: ArticlesPanel) -> Result<Response, AppError> {
         notice: panel.notice,
         posts_nav_active: true,
         feeds_nav_active: false,
-        sources_nav_active: false,
-    })
-}
-
-fn render_feeds_panel(panel: FeedsPanel) -> Result<Response, AppError> {
-    render_template(FeedsPanelTemplate {
-        feeds: panel.feeds,
-        tags: panel.tags,
-        selected_tag: panel.selected_tag,
-        all_active: panel.all_active,
-        all_tags_href: panel.all_tags_href,
-        all_tags_fragment_href: panel.all_tags_fragment_href,
     })
 }
 
@@ -1333,8 +1333,8 @@ mod tests {
     }
 
     #[test]
-    fn feed_directory_filters_by_tag_and_links_to_posts() {
-        let panel = feed_directory(
+    fn feed_list_filters_by_tag_and_links_to_posts() {
+        let list = feed_list(
             vec![
                 feed("https://example.com/zebra", "Zebra", &["news"]),
                 feed(
@@ -1345,26 +1345,34 @@ mod tests {
                 feed("https://example.com/sports", "Sports", &["sports"]),
             ],
             "news".to_owned(),
+            Notice::default(),
         );
 
         assert_eq!(
-            panel
-                .feeds
+            list.feeds
                 .iter()
                 .map(|feed| feed.name.as_str())
                 .collect::<Vec<_>>(),
             vec!["Alpha Daily", "Zebra"]
         );
         assert_eq!(
-            panel
-                .tags
+            list.tags
                 .iter()
                 .map(|tag| tag.name.as_str())
                 .collect::<Vec<_>>(),
             vec!["news", "sports", "technology"]
         );
-        assert_eq!(panel.feeds[0].posts_href, "/?feed=Alpha+Daily");
-        assert!(panel.tags[0].active);
-        assert!(!panel.all_active);
+        assert_eq!(list.feeds[0].posts_href, "/?feed=Alpha+Daily");
+        assert_eq!(list.feeds[0].tags_input, "news, technology");
+        assert!(list.tags[0].active);
+        assert!(!list.all_active);
+
+        let empty_filter = feed_list(
+            vec![feed("https://example.com/sports", "Sports", &["sports"])],
+            "news".to_owned(),
+            Notice::default(),
+        );
+        assert!(empty_filter.feeds.is_empty());
+        assert!(empty_filter.tags.iter().any(|tag| tag.active));
     }
 }

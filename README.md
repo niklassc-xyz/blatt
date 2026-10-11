@@ -16,7 +16,7 @@ Open <http://127.0.0.1:3000> after installation.
 
 ## Configuration
 
-Feeds can be browsed by name and tag from the **Feeds** page. Select one to show only its posts. Subscriptions can be managed from the **Sources** page or by editing the XDG-compliant configuration file:
+Feeds can be added, filtered by tag, edited, and removed from the **Feeds** page. Select **View posts** beside a feed to show only its posts. Subscriptions can also be managed by editing the XDG-compliant configuration file:
 
 - `$XDG_CONFIG_HOME/blatt/feeds.toml`
 - `~/.config/blatt/feeds.toml` when `XDG_CONFIG_HOME` is unset

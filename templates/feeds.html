@@ -6,14 +6,31 @@
 <main class="page-shell feeds-page">
   <section class="page-header">
     <div>
-      <p class="eyebrow">Your subscriptions</p>
+      <p class="eyebrow">Manage subscriptions</p>
       <h1>Feeds</h1>
     </div>
-    <p class="page-intro">Choose a feed to see its posts.</p>
   </section>
 
-  <div id="feeds-panel">
-    {% include "feeds_panel.html" %}
-  </div>
+  <section class="add-feed" aria-labelledby="add-feed-title">
+    <div>
+      <h2 id="add-feed-title">Add a feed</h2>
+      <p>RSS, Atom, and YouTube channel feeds are supported.</p>
+    </div>
+    <form id="add-feed-form" method="post" action="/feeds" hx-post="/feeds" hx-target="#feed-list" hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input id="selected-feed-tag" type="hidden" name="tag" value="{{ selected_tag }}">
+      <label>Feed URL<input id="new-feed-url" type="url" name="url" value="{{ new_feed.url }}" placeholder="https://example.com/feed.xml" autocomplete="off" required></label>
+      <div class="form-field">
+        <label for="new-feed-name">Name</label>
+        {% include "feed_name_field.html" %}
+      </div>
+      <label>Tags<input type="text" name="tags" value="{{ new_feed.tags }}" placeholder="news, technology"></label>
+      <button id="add-feed-button" type="submit">Add feed</button>
+    </form>
+  </section>
+
+  {% include "feed_list.html" %}
+
+  <p class="config-note">Configuration file: <code>{{ config_path }}</code></p>
 </main>
 {% endblock %}

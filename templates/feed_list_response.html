@@ -1,4 +1,5 @@
 {% include "feed_list.html" %}
+<input id="selected-feed-tag" type="hidden" name="tag" value="{{ selected_tag }}" hx-swap-oob="outerHTML">
 {% if clear_new_feed %}
 <input id="new-feed-url" type="url" name="url" placeholder="https://example.com/feed.xml" autocomplete="off" required hx-swap-oob="outerHTML">
 <input id="new-feed-name" type="text" name="name" placeholder="Example News" autocomplete="off" required hx-swap-oob="outerHTML">

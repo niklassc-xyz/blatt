@@ -548,60 +548,38 @@ button:hover {
 }
 
 .feeds-filter-bar {
-  margin-top: 2rem;
+  margin-top: 0;
 }
 
-.feed-directory {
+.feed-management-list {
   margin-top: 0.35rem;
 }
 
-.feed-directory-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, auto);
+.feed-card-header {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1.5rem;
-  margin-inline: -0.75rem;
-  padding: 1.15rem 0.75rem;
-  border-bottom: 1px solid var(--highlight-med);
-  color: inherit;
-  text-decoration: none;
 }
 
-.feed-directory-main {
+.feed-card-summary {
   min-width: 0;
 }
 
-.feed-directory-main h2 {
+.feed-card-summary h3 {
   margin-bottom: 0.25rem;
   font-size: 1.05rem;
   font-weight: 680;
   letter-spacing: -0.02em;
 }
 
-.feed-directory-main p {
-  overflow: hidden;
-  margin-bottom: 0;
-  color: var(--secondary-text);
-  font-size: 0.7rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.feed-directory-details {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.75rem;
-}
-
-.feed-directory-tags {
+.feed-tags {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
   gap: 0.25rem;
 }
 
-.feed-directory-tags span {
+.feed-tags span {
   padding: 0.18rem 0.4rem;
   border-radius: 2px;
   color: var(--secondary-text);
@@ -610,25 +588,17 @@ button:hover {
   font-weight: 650;
 }
 
-.feed-directory-action {
+.feed-view-link {
   flex: 0 0 auto;
   color: var(--interactive-text);
   font-size: 0.72rem;
   font-weight: 700;
+  text-decoration: none;
 }
 
-.feed-directory-row:hover,
-.feed-directory-row:focus-visible {
-  color: var(--love);
-  background: var(--highlight-low);
-}
-
-.feed-directory-row:focus-visible {
-  outline-offset: 0;
-}
-
-.sources-page {
-  max-width: 960px;
+.feed-view-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
 }
 
 .add-feed {
@@ -743,15 +713,19 @@ input:focus {
 }
 
 .feed-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 0.75rem;
   margin-bottom: 0.75rem;
   padding: 1rem;
   border: 1px solid var(--highlight-med);
   border-radius: 4px;
   background: var(--surface);
+}
+
+.feed-card-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
 }
 
 .feed-fields {
@@ -842,25 +816,15 @@ input:focus {
     gap: 1.25rem;
   }
 
-  .feed-card,
+  .feed-card-controls,
   .feed-fields {
     grid-template-columns: 1fr;
   }
 
-  .feed-card > form:last-child,
-  .feed-card > form:last-child button,
+  .feed-card-controls > form:last-child,
+  .feed-card-controls > form:last-child button,
   .feed-fields > button {
     width: 100%;
-  }
-
-  .feed-directory-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.65rem;
-  }
-
-  .feed-directory-details,
-  .feed-directory-tags {
-    justify-content: flex-start;
   }
 }
 

@@ -87,7 +87,7 @@ const replaceYouTubeChannelUrl = async (form, button, message) => {
       url: urlInput.value,
       csrf_token: csrfInput.value,
     });
-    const response = await window.fetch("/sources/youtube-feed", {
+    const response = await window.fetch("/feeds/youtube-feed", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
@@ -116,7 +116,7 @@ document.addEventListener(
   async (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || form.id !== "add-feed-form") return;
-    if (event.submitter?.getAttribute("formaction") === "/sources/title") return;
+    if (event.submitter?.getAttribute("formaction") === "/feeds/title") return;
 
     const urlInput = form.elements.namedItem("url");
     if (!(urlInput instanceof HTMLInputElement) || !isYouTubeChannelUrl(urlInput.value)) return;
@@ -137,7 +137,7 @@ document.addEventListener(
   "click",
   async (event) => {
     if (!(event.target instanceof Element)) return;
-    const button = event.target.closest('button[formaction="/sources/title"]');
+    const button = event.target.closest('button[formaction="/feeds/title"]');
     if (!(button instanceof HTMLButtonElement) || !(button.form instanceof HTMLFormElement)) {
       return;
     }
