@@ -1,7 +1,7 @@
 use std::{io::Cursor, time::Duration};
 
 use chrono::Utc;
-use feed_rs::model::Entry;
+use feed_rs::model::{Entry, Feed};
 use futures_util::{StreamExt, stream};
 use reqwest::{Client, Url};
 
@@ -77,10 +77,24 @@ impl FeedCollector {
         report
     }
 
+    pub async fn fetch_title(&self, url: &str) -> Result<String, String> {
+        let (bytes, base_url) = self.download(url).await?;
+        parse_title(&bytes, &base_url)
+    }
+
     async fn fetch(&self, feed: &FeedConfig) -> Result<Vec<Article>, String> {
+        let (bytes, base_url) = self.download(&feed.url).await?;
+        parse_articles(feed, &bytes, &base_url)
+    }
+
+    async fn download(&self, url: &str) -> Result<(Vec<u8>, Url), String> {
+        let url = Url::parse(url.trim())
+            .ok()
+            .filter(|url| matches!(url.scheme(), "http" | "https"))
+            .ok_or_else(|| "feed URL must be a valid HTTP or HTTPS URL".to_owned())?;
         let mut response = self
             .client
-            .get(&feed.url)
+            .get(url)
             .send()
             .await
             .map_err(|error| error.to_string())?
@@ -102,8 +116,24 @@ impl FeedCollector {
             bytes.extend_from_slice(&chunk);
         }
 
-        parse_articles(feed, &bytes, &base_url)
+        Ok((bytes, base_url))
     }
+}
+
+fn parse_feed(bytes: &[u8], base_url: &Url) -> Result<Feed, String> {
+    feed_rs::parser::Builder::new()
+        .base_uri(Some(base_url.as_str()))
+        .build()
+        .parse(Cursor::new(bytes))
+        .map_err(|error| error.to_string())
+}
+
+fn parse_title(bytes: &[u8], base_url: &Url) -> Result<String, String> {
+    parse_feed(bytes, base_url)?
+        .title
+        .map(|title| title.content.trim().to_owned())
+        .filter(|title| !title.is_empty())
+        .ok_or_else(|| "feed does not have a title".to_owned())
 }
 
 fn parse_articles(
@@ -111,12 +141,7 @@ fn parse_articles(
     bytes: &[u8],
     base_url: &Url,
 ) -> Result<Vec<Article>, String> {
-    let parser = feed_rs::parser::Builder::new()
-        .base_uri(Some(base_url.as_str()))
-        .build();
-    let parsed = parser
-        .parse(Cursor::new(bytes))
-        .map_err(|error| error.to_string())?;
+    let parsed = parse_feed(bytes, base_url)?;
     let fetched_at = Utc::now().timestamp();
 
     Ok(parsed
@@ -252,6 +277,21 @@ fn web_url(value: &str, base_url: &Url) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_and_trims_feed_title() {
+        let xml = br#"<?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0">
+              <channel>
+                <title> Example News </title>
+                <link>https://example.com/</link>
+                <description>News</description>
+              </channel>
+            </rss>"#;
+        let base_url = Url::parse("https://example.com/feed.xml").unwrap();
+
+        assert_eq!(parse_title(xml, &base_url).unwrap(), "Example News");
+    }
 
     #[test]
     fn parses_youtube_atom_entries() {

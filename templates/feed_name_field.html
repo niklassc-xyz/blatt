@@ -1,0 +1,9 @@
+<div id="new-feed-name-field" class="feed-name-field">
+  <div class="input-action">
+    <input id="new-feed-name" type="text" name="name" value="{{ new_feed.name }}" placeholder="Example News"{% if !new_feed.title_notice.text.is_empty() %} aria-describedby="feed-title-notice"{% endif %} required>
+    <button class="input-action-button" type="submit" formaction="/sources/title" formmethod="post" formnovalidate hx-post="/sources/title" hx-include="closest form" hx-target="#new-feed-name-field" hx-swap="outerHTML" hx-disabled-elt="this">Fetch title</button>
+  </div>
+  {% if !new_feed.title_notice.text.is_empty() %}
+  <span id="feed-title-notice" class="field-notice{% if new_feed.title_notice.is_error %} field-notice-error{% endif %}" role="status">{{ new_feed.title_notice.text }}</span>
+  {% endif %}
+</div>

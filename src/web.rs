@@ -91,6 +91,16 @@ struct FeedForm {
 }
 
 #[derive(Debug, Deserialize)]
+struct FeedTitleForm {
+    url: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    tags: String,
+    csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct UpdateFeedForm {
     original_url: String,
     url: String,
@@ -195,6 +205,14 @@ struct FeedList {
     notice: Notice,
 }
 
+#[derive(Default)]
+struct NewFeedView {
+    url: String,
+    name: String,
+    tags: String,
+    title_notice: Notice,
+}
+
 #[derive(Template)]
 #[template(path = "index.html")]
 struct IndexTemplate {
@@ -268,6 +286,7 @@ struct SourcesTemplate {
     notice: Notice,
     config_path: String,
     csrf_token: String,
+    new_feed: NewFeedView,
     posts_nav_active: bool,
     feeds_nav_active: bool,
     sources_nav_active: bool,
@@ -279,6 +298,12 @@ struct FeedListTemplate {
     feeds: Vec<FeedView>,
     notice: Notice,
     csrf_token: String,
+}
+
+#[derive(Template)]
+#[template(path = "feed_name_field.html")]
+struct FeedNameFieldTemplate {
+    new_feed: NewFeedView,
 }
 
 pub async fn serve(address: SocketAddr, paths: AppPaths) -> Result<(), Box<dyn std::error::Error>> {
@@ -303,6 +328,7 @@ pub async fn serve(address: SocketAddr, paths: AppPaths) -> Result<(), Box<dyn s
         .route("/feeds", get(feeds_page))
         .route("/feeds/list", get(feeds_fragment))
         .route("/sources", get(sources_page).post(add_feed))
+        .route("/sources/title", post(fetch_feed_title))
         .route("/sources/update", post(update_feed))
         .route("/sources/delete", post(delete_feed))
         .route("/static/style.css", get(stylesheet))
@@ -451,15 +477,7 @@ async fn feeds_fragment(
 
 async fn sources_page(State(state): State<AppState>) -> Result<Response, AppError> {
     let list = build_feed_list(&state, Notice::default())?;
-    render_template(SourcesTemplate {
-        feeds: list.feeds,
-        notice: list.notice,
-        config_path: state.config_path,
-        csrf_token: state.csrf_token,
-        posts_nav_active: false,
-        feeds_nav_active: false,
-        sources_nav_active: true,
-    })
+    render_sources_page(&state, list, NewFeedView::default())
 }
 
 async fn add_feed(
@@ -475,6 +493,43 @@ async fn add_feed(
     });
     let notice = operation_notice(result, "Feed added. Use refresh to retrieve its articles.");
     render_source_response(&state, &headers, notice)
+}
+
+async fn fetch_feed_title(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<FeedTitleForm>,
+) -> Result<Response, AppError> {
+    verify_csrf(&state, &form.csrf_token)?;
+    let (name, title_notice) = match state.collector.fetch_title(&form.url).await {
+        Ok(title) => (
+            title,
+            Notice {
+                text: "Feed title fetched.".to_owned(),
+                is_error: false,
+            },
+        ),
+        Err(error) => (
+            form.name,
+            Notice {
+                text: format!("Could not fetch title: {error}"),
+                is_error: true,
+            },
+        ),
+    };
+    let new_feed = NewFeedView {
+        url: form.url,
+        name,
+        tags: form.tags,
+        title_notice,
+    };
+
+    if is_htmx(&headers) {
+        render_template(FeedNameFieldTemplate { new_feed })
+    } else {
+        let list = build_feed_list(&state, Notice::default())?;
+        render_sources_page(&state, list, new_feed)
+    }
 }
 
 async fn update_feed(
@@ -556,16 +611,25 @@ fn render_source_response(
             csrf_token: state.csrf_token.clone(),
         })
     } else {
-        render_template(SourcesTemplate {
-            feeds: list.feeds,
-            notice: list.notice,
-            config_path: state.config_path.clone(),
-            csrf_token: state.csrf_token.clone(),
-            posts_nav_active: false,
-            feeds_nav_active: false,
-            sources_nav_active: true,
-        })
+        render_sources_page(state, list, NewFeedView::default())
     }
+}
+
+fn render_sources_page(
+    state: &AppState,
+    list: FeedList,
+    new_feed: NewFeedView,
+) -> Result<Response, AppError> {
+    render_template(SourcesTemplate {
+        feeds: list.feeds,
+        notice: list.notice,
+        config_path: state.config_path.clone(),
+        csrf_token: state.csrf_token.clone(),
+        new_feed,
+        posts_nav_active: false,
+        feeds_nav_active: false,
+        sources_nav_active: true,
+    })
 }
 
 async fn build_articles_panel(

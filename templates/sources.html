@@ -19,9 +19,12 @@
     </div>
     <form method="post" action="/sources" hx-post="/sources" hx-target="#feed-list" hx-swap="outerHTML">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label>Feed URL<input type="url" name="url" placeholder="https://example.com/feed.xml" required></label>
-      <label>Name<input type="text" name="name" placeholder="Example News" required></label>
-      <label>Tags<input type="text" name="tags" placeholder="news, technology"></label>
+      <label>Feed URL<input type="url" name="url" value="{{ new_feed.url }}" placeholder="https://example.com/feed.xml" required></label>
+      <div class="form-field">
+        <label for="new-feed-name">Name</label>
+        {% include "feed_name_field.html" %}
+      </div>
+      <label>Tags<input type="text" name="tags" value="{{ new_feed.tags }}" placeholder="news, technology"></label>
       <button type="submit">Add feed</button>
     </form>
   </section>
