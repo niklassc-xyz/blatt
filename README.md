@@ -30,8 +30,8 @@ name = "Example News"
 tags = ["news", "technology"]
 
 [[feeds]]
-url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCUyeluBRhGPCW4rPe_UvBZQ"
-name = "The Coding Train"
+url = "https://www.youtube.com/feeds/videos.xml?channel_id=YOUR_CHANNEL_ID"
+name = "Example Channel"
 tags = ["video", "programming"]
 ```
 
